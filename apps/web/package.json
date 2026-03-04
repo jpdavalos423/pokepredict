@@ -1,0 +1,26 @@
+{
+  "name": "@pokepredict/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "prebuild": "pnpm --filter @pokepredict/shared build",
+    "build": "next build",
+    "start": "next start",
+    "pretest": "pnpm --filter @pokepredict/shared build",
+    "test": "vitest run",
+    "lint": "eslint \"app/**/*.{ts,tsx}\" \"lib/**/*.ts\" \"tests/**/*.ts\"",
+    "pretypecheck": "pnpm --filter @pokepredict/shared build",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@pokepredict/shared": "workspace:*",
+    "next": "^15.5.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9"
+  }
+}

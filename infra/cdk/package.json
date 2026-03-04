@@ -1,0 +1,19 @@
+{
+  "name": "@pokepredict/cdk",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint \"bin/**/*.ts\" \"lib/**/*.ts\" \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "cdk ls"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.220.0",
+    "constructs": "^10.4.2"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.1014.0"
+  }
+}
