@@ -1,27 +1,33 @@
-# Pokepredict Architecture (Phase 0 Baseline)
+# Pokepredict Architecture
 
 ## Components
 - Web UI: Next.js app in `apps/web`
 - API: API Gateway -> Lambda (`apps/api`)
-- Pipeline: EventBridge -> Step Functions -> pipeline Lambdas (`apps/pipeline`)
+- Pipeline: EventBridge -> Step Functions -> pipeline Lambdas
 - Data: DynamoDB tables defined in `docs/data-model.md`
 - Raw archive: S3 bucket for source payloads
-- Alerts delivery: SES
+- Alerts delivery: SES (Phase 5)
 - IaC: AWS CDK in `infra/cdk`
 
-## Data Flow (Target)
-1. EventBridge triggers Step Functions with `runId`, `source`, `mode`.
-2. `FetchRawLambda` fetches source payload and stores raw JSON in S3.
-3. `NormalizeLambda` canonicalizes card IDs and writes to `Prices` and `LatestPrices`.
-4. `ComputeSignalsLambda` computes derived metrics and writes to `Signals`.
-5. `AlertsEvalLambda` checks `AlertsByCard`, applies cooldown/crossing logic, and sends SES notifications.
+## Implemented Phase 1 Data Flow
+1. EventBridge schedule triggers Step Functions with fixed input:
+   - `source=fixture`
+   - `mode=scheduled`
+2. `StartRun` stamps:
+   - `runId` (provided or generated)
+   - `asOf` (provided or current UTC)
+3. `FetchRaw` obtains fixture data and writes raw JSON to S3 at:
+   - `raw/<source>/YYYY/MM/DD/HH/<runId>.json`
+4. `Normalize` reads raw payload, maps to canonical card IDs from `Cards`, and writes:
+   - `Prices` time-series points
+   - `LatestPrices` snapshots guarded by newer `asOf`
 
-## API Flow (Target)
-- Web app calls API endpoints via API Gateway.
-- Lambda handlers validate inputs and return standardized envelope responses.
-- DynamoDB access patterns avoid full table scans in primary flows.
+## Planned Later Steps
+- `ComputeSignals` (Phase 4)
+- `AlertsEval` + SES notifications (Phase 5)
 
 ## Operational Baseline
-- Structured JSON logs for handlers and pipeline steps.
-- CloudWatch alarms for Step Functions failures and Lambda error rates.
-- MVP auth: `x-user-id` header; future path to Cognito JWT.
+- Structured JSON logs include run context (`runId`, `source`, `mode`).
+- CloudWatch alarms on:
+  - Step Functions failures
+  - Lambda errors (`StartRun`, `FetchRaw`, `Normalize`)

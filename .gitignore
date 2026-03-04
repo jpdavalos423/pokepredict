@@ -7,4 +7,5 @@ test-results/
 cdk.out/
 .pnpm-store/
 .env
+.phase1.env
 *.tsbuildinfo

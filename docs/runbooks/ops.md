@@ -1,7 +1,4 @@
-# Operations Runbook (Phase 0)
-
-## Purpose
-Provide baseline operational guidance for local scaffold validation and future incident docs.
+# Operations Runbook
 
 ## Local Validation
 Run from repo root:
@@ -13,12 +10,34 @@ pnpm test
 pnpm build
 ```
 
-## Current Known Warnings
-- Engine warning appears if local Node is not `>=22 <23`.
-- Next.js may warn about ESLint plugin migration; this does not block Phase 0 acceptance.
+## Seed Cards
+```bash
+pnpm generate:data
+```
+Required env vars:
+- `AWS_REGION`
+- `TABLE_CARDS`
 
-## Future Runbook Additions (Phase 1+)
-- Pipeline failure triage
-- Replay and idempotency playbook
-- Alert delivery troubleshooting
-- DynamoDB throughput and error handling guidance
+## Pipeline Manual Trigger
+Start the Step Functions state machine with input:
+```json
+{
+  "source": "fixture",
+  "mode": "manual",
+  "runId": "run_manual_001",
+  "asOf": "2026-03-04T18:00:00.000Z"
+}
+```
+
+## Failure Triage
+1. Check Step Functions execution error in CloudWatch logs.
+2. If failure is in `FetchRaw`, verify source config and S3 write permissions.
+3. If failure is in `Normalize`, verify:
+- `Cards` seed data exists
+- `rawS3Key` object exists
+- DynamoDB write permissions and conditional update behavior
+4. Re-run with manual execution and explicit `runId` for traceability.
+
+## Replay Guidance
+- Replays with identical `runId`/timestamp inputs should overwrite deterministic keys.
+- `LatestPrices` only updates when incoming `asOf` is newer.

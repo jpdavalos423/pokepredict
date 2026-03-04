@@ -13,3 +13,7 @@ export const HOLDING_VARIANTS = [
   'other'
 ] as const;
 export const HOLDING_CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'] as const;
+
+export const DEFAULT_SOURCE = 'fixture' as const;
+export const DEFAULT_INGEST_SCHEDULE_CRON = 'cron(0 6 * * ? *)';
+export const SUPPORTED_CURRENCIES = ['USD'] as const;

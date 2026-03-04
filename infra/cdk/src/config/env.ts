@@ -3,6 +3,8 @@ export interface CdkEnvConfig {
   region: string;
   project: string;
   stage: string;
+  sourceName: string;
+  ingestScheduleCron: string;
 }
 
 function readOrDefault(name: string, fallback: string): string {
@@ -14,6 +16,8 @@ export function loadCdkEnvConfig(): CdkEnvConfig {
     account: readOrDefault('CDK_DEFAULT_ACCOUNT', '000000000000'),
     region: readOrDefault('CDK_DEFAULT_REGION', 'us-west-2'),
     project: readOrDefault('PROJECT_NAME', 'pokepredict'),
-    stage: readOrDefault('STAGE', 'dev')
+    stage: readOrDefault('STAGE', 'dev'),
+    sourceName: readOrDefault('SOURCE_NAME', 'fixture'),
+    ingestScheduleCron: readOrDefault('INGEST_SCHEDULE_CRON', 'cron(0 6 * * ? *)')
   };
 }

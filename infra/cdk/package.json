@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "pnpm --filter @pokepredict/pipeline build",
     "build": "tsc -p tsconfig.json",
+    "pretest": "pnpm --filter @pokepredict/pipeline build",
     "test": "vitest run",
     "lint": "eslint \"bin/**/*.ts\" \"lib/**/*.ts\" \"src/**/*.ts\" \"tests/**/*.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "predev": "pnpm --filter @pokepredict/pipeline build",
     "dev": "cdk ls"
   },
   "dependencies": {
@@ -14,6 +17,7 @@
     "constructs": "^10.4.2"
   },
   "devDependencies": {
-    "aws-cdk": "^2.1014.0"
+    "aws-cdk": "^2.1014.0",
+    "esbuild": "^0.25.10"
   }
 }

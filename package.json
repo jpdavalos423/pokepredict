@@ -11,6 +11,8 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "test:e2e": "playwright test",
+    "generate:data": "tsx scripts/bootstrap-cards.ts",
+    "deploy:phase1": "bash scripts/deploy-phase1.sh --run",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "dev:web": "pnpm --filter @pokepredict/web dev",
@@ -19,10 +21,13 @@
     "dev:cdk": "pnpm --filter @pokepredict/cdk dev"
   },
   "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.916.0",
+    "@aws-sdk/lib-dynamodb": "^3.916.0",
     "@playwright/test": "^1.57.0",
     "@types/node": "^24.5.2",
     "@typescript-eslint/eslint-plugin": "^8.44.1",
     "@typescript-eslint/parser": "^8.44.1",
+    "esbuild": "^0.25.12",
     "eslint": "^8.57.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.2",

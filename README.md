@@ -23,6 +23,18 @@ pnpm test
 pnpm build
 ```
 
+## Seed Cards
+```bash
+pnpm generate:data
+```
+Requires `TABLE_CARDS` and `AWS_REGION` env vars (see `.env.example`).
+
+## Phase 1 Fast Deploy
+```bash
+pnpm deploy:phase1
+```
+This builds pipeline artifacts, vendors runtime deps, deploys CDK, seeds cards, and triggers one manual ingestion run.
+
 ## Dev Commands
 ```bash
 pnpm dev:web

@@ -13,5 +13,7 @@ new PokepredictStack(app, `${cfg.project}-${cfg.stage}-stack`, {
   },
   project: cfg.project,
   stage: cfg.stage,
-  description: 'PokePredict Phase 0 CDK scaffold stack.'
+  sourceName: cfg.sourceName,
+  ingestScheduleCron: cfg.ingestScheduleCron,
+  description: 'PokePredict Phase 1 data platform stack.'
 });

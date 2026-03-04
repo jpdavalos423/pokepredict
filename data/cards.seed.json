@@ -1,0 +1,47 @@
+[
+  {
+    "cardId": "sv3-198",
+    "name": "Venusaur ex",
+    "setId": "sv3",
+    "setName": "151",
+    "number": "198",
+    "rarity": "Special Illustration Rare",
+    "imageUrl": "https://images.pokepredict.dev/cards/sv3-198.png"
+  },
+  {
+    "cardId": "sv3-169",
+    "name": "Charizard ex",
+    "setId": "sv3",
+    "setName": "151",
+    "number": "169",
+    "rarity": "Ultra Rare",
+    "imageUrl": "https://images.pokepredict.dev/cards/sv3-169.png"
+  },
+  {
+    "cardId": "swsh12-TG30",
+    "name": "Rayquaza VMAX",
+    "setId": "swsh12",
+    "setName": "Silver Tempest",
+    "number": "TG30",
+    "rarity": "Trainer Gallery",
+    "imageUrl": "https://images.pokepredict.dev/cards/swsh12-TG30.png"
+  },
+  {
+    "cardId": "sv2-203",
+    "name": "Iono",
+    "setId": "sv2",
+    "setName": "Paldea Evolved",
+    "number": "203",
+    "rarity": "Special Illustration Rare",
+    "imageUrl": "https://images.pokepredict.dev/cards/sv2-203.png"
+  },
+  {
+    "cardId": "base1-4",
+    "name": "Charizard",
+    "setId": "base1",
+    "setName": "Base Set",
+    "number": "4",
+    "rarity": "Holo Rare",
+    "imageUrl": "https://images.pokepredict.dev/cards/base1-4.png"
+  }
+]

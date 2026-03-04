@@ -2,7 +2,8 @@ import { z } from 'zod';
 import {
   ALERT_TYPES,
   HOLDING_CONDITIONS,
-  HOLDING_VARIANTS
+  HOLDING_VARIANTS,
+  SUPPORTED_CURRENCIES
 } from '../constants';
 
 export const cardSchema = z.object({
@@ -23,7 +24,7 @@ export const pricePointSchema = z.object({
   marketCents: z.int().nonnegative(),
   lowCents: z.int().nonnegative().optional(),
   highCents: z.int().nonnegative().optional(),
-  currency: z.literal('USD'),
+  currency: z.enum(SUPPORTED_CURRENCIES),
   source: z.string().min(1)
 });
 
@@ -50,4 +51,57 @@ export const alertSchema = z.object({
   notifyEmail: z.string().email(),
   enabled: z.boolean(),
   lastTriggeredAt: z.string().datetime().optional()
+});
+
+export const startRunInputSchema = z.object({
+  source: z.string().min(1),
+  mode: z.enum(['scheduled', 'manual']),
+  runId: z.string().min(1).optional(),
+  asOf: z.string().datetime().optional()
+});
+
+export const startRunResultSchema = z.object({
+  runId: z.string().min(1),
+  asOf: z.string().datetime(),
+  source: z.string().min(1),
+  mode: z.enum(['scheduled', 'manual']),
+  startedAt: z.string().datetime()
+});
+
+export const rawPriceRecordSchema = z.object({
+  sourceCardId: z.string().min(1),
+  recordedAt: z.string().datetime(),
+  marketPrice: z.number().nonnegative(),
+  lowPrice: z.number().nonnegative().optional(),
+  highPrice: z.number().nonnegative().optional(),
+  currency: z.enum(SUPPORTED_CURRENCIES)
+});
+
+export const rawFetchPayloadSchema = z.object({
+  runId: z.string().min(1),
+  asOf: z.string().datetime(),
+  source: z.string().min(1),
+  mode: z.enum(['scheduled', 'manual']),
+  records: z.array(rawPriceRecordSchema)
+});
+
+export const fetchRawResultSchema = z.object({
+  runId: z.string().min(1),
+  asOf: z.string().datetime(),
+  source: z.string().min(1),
+  mode: z.enum(['scheduled', 'manual']),
+  startedAt: z.string().datetime(),
+  rawS3Key: z.string().min(1),
+  rawRecordCount: z.number().int().nonnegative(),
+  fetchedAt: z.string().datetime()
+});
+
+export const normalizeResultSchema = z.object({
+  runId: z.string().min(1),
+  asOf: z.string().datetime(),
+  source: z.string().min(1),
+  mode: z.enum(['scheduled', 'manual']),
+  startedAt: z.string().datetime(),
+  processedCount: z.number().int().nonnegative(),
+  updatedCardIds: z.array(z.string().min(1))
 });

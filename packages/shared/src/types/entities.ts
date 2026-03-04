@@ -14,8 +14,8 @@ export interface PricePoint {
   cardId: string;
   ts: string;
   marketCents: number;
-  lowCents?: number;
-  highCents?: number;
+  lowCents?: number | undefined;
+  highCents?: number | undefined;
   currency: 'USD';
   source: string;
 }
@@ -24,8 +24,8 @@ export interface LatestPrice {
   cardId: string;
   asOf: string;
   marketCents: number;
-  lowCents?: number;
-  highCents?: number;
+  lowCents?: number | undefined;
+  highCents?: number | undefined;
   currency: 'USD';
   source: string;
 }
@@ -73,8 +73,60 @@ export interface Alert {
   lastTriggeredAt?: string;
 }
 
-export interface PipelineEventContext {
-  runId: string;
+export type PipelineMode = 'scheduled' | 'manual';
+
+export interface StartRunInput {
   source: string;
-  mode: 'scheduled' | 'manual';
+  mode: PipelineMode;
+  runId?: string;
+  asOf?: string;
 }
+
+export interface StartRunResult {
+  runId: string;
+  asOf: string;
+  source: string;
+  mode: PipelineMode;
+  startedAt: string;
+}
+
+export interface RawPriceRecord {
+  sourceCardId: string;
+  recordedAt: string;
+  marketPrice: number;
+  lowPrice?: number | undefined;
+  highPrice?: number | undefined;
+  currency: 'USD';
+}
+
+export interface RawFetchPayload {
+  runId: string;
+  asOf: string;
+  source: string;
+  mode: PipelineMode;
+  records: RawPriceRecord[];
+}
+
+export interface FetchRawResult extends StartRunResult {
+  rawS3Key: string;
+  rawRecordCount: number;
+  fetchedAt: string;
+}
+
+export interface NormalizedPriceRecord {
+  cardId: string;
+  ts: string;
+  marketCents: number;
+  lowCents?: number | undefined;
+  highCents?: number | undefined;
+  currency: 'USD';
+  source: string;
+  runId: string;
+}
+
+export interface NormalizeResult extends StartRunResult {
+  processedCount: number;
+  updatedCardIds: string[];
+}
+
+export type PipelineEventContext = StartRunResult;
