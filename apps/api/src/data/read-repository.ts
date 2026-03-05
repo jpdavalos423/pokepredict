@@ -1,0 +1,266 @@
+import { GetCommand, QueryCommand, type DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import type {
+  CardDetail,
+  CardListItem,
+  LatestPriceResponse,
+  PriceHistoryPoint
+} from '@pokepredict/shared';
+import type { ApiConfig } from '../config';
+
+export interface ListCardsBySetInput {
+  setId: string;
+  normalizedQuery?: string;
+  limit: number;
+  exclusiveStartKey?: Record<string, unknown>;
+}
+
+export interface ListCardsByNamePrefixInput {
+  normalizedQuery: string;
+  limit: number;
+  exclusiveStartKey?: Record<string, unknown>;
+}
+
+export interface PaginatedItems<T> {
+  items: T[];
+  lastEvaluatedKey?: Record<string, unknown>;
+}
+
+export interface ApiReadRepository {
+  listCardsBySet(input: ListCardsBySetInput): Promise<PaginatedItems<CardListItem>>;
+  listCardsByNamePrefix(input: ListCardsByNamePrefixInput): Promise<PaginatedItems<CardListItem>>;
+  getCardById(cardId: string): Promise<CardDetail | null>;
+  getLatestPrice(cardId: string): Promise<LatestPriceResponse | null>;
+  getPriceHistory(cardId: string, fromIso: string, toIso: string): Promise<PriceHistoryPoint[]>;
+}
+
+function asString(value: unknown, field: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`Missing required field ${field}.`);
+  }
+  return value;
+}
+
+function asNumber(value: unknown, field: string): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    throw new Error(`Missing required field ${field}.`);
+  }
+  return value;
+}
+
+function asOptionalNumber(value: unknown): number | undefined {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return undefined;
+  }
+  return value;
+}
+
+function toCardListItem(item: Record<string, unknown>): CardListItem {
+  const card: CardListItem = {
+    cardId: asString(item.cardId, 'cardId'),
+    name: asString(item.name, 'name'),
+    set: {
+      id: asString(item.setId, 'setId'),
+      name: asString(item.setName, 'setName')
+    },
+    number: asString(item.number, 'number')
+  };
+
+  if (typeof item.rarity === 'string') {
+    card.rarity = item.rarity;
+  }
+
+  if (typeof item.imageUrl === 'string') {
+    card.imageUrl = item.imageUrl;
+  }
+
+  return card;
+}
+
+function toCardDetail(item: Record<string, unknown>): CardDetail {
+  const card: CardDetail = {
+    cardId: asString(item.cardId, 'cardId'),
+    name: asString(item.name, 'name'),
+    set: {
+      id: asString(item.setId, 'setId'),
+      name: asString(item.setName, 'setName')
+    },
+    number: asString(item.number, 'number')
+  };
+
+  if (typeof item.rarity === 'string') {
+    card.rarity = item.rarity;
+  }
+
+  if (typeof item.imageUrl === 'string') {
+    card.imageUrl = item.imageUrl;
+  }
+
+  return card;
+}
+
+function toLatestPrice(item: Record<string, unknown>): LatestPriceResponse {
+  const latest: LatestPriceResponse = {
+    cardId: asString(item.cardId, 'cardId'),
+    asOf: asString(item.asOf, 'asOf'),
+    marketCents: asNumber(item.marketCents, 'marketCents'),
+    currency: 'USD',
+    source: asString(item.source, 'source')
+  };
+
+  const lowCents = asOptionalNumber(item.lowCents);
+  if (lowCents !== undefined) {
+    latest.lowCents = lowCents;
+  }
+
+  const highCents = asOptionalNumber(item.highCents);
+  if (highCents !== undefined) {
+    latest.highCents = highCents;
+  }
+
+  return latest;
+}
+
+function toHistoryPoint(item: Record<string, unknown>): PriceHistoryPoint {
+  const point: PriceHistoryPoint = {
+    ts: asString(item.ts, 'ts'),
+    marketCents: asNumber(item.marketCents, 'marketCents'),
+    currency: 'USD',
+    source: asString(item.source, 'source')
+  };
+
+  const lowCents = asOptionalNumber(item.lowCents);
+  if (lowCents !== undefined) {
+    point.lowCents = lowCents;
+  }
+
+  const highCents = asOptionalNumber(item.highCents);
+  if (highCents !== undefined) {
+    point.highCents = highCents;
+  }
+
+  return point;
+}
+
+export class DynamoApiReadRepository implements ApiReadRepository {
+  constructor(
+    private readonly ddb: DynamoDBDocumentClient,
+    private readonly cfg: ApiConfig
+  ) {}
+
+  async listCardsBySet(input: ListCardsBySetInput): Promise<PaginatedItems<CardListItem>> {
+    const expressionValues: Record<string, unknown> = {
+      ':gsi1pk': `SET#${input.setId}`
+    };
+
+    let filterExpression: string | undefined;
+    if (input.normalizedQuery) {
+      expressionValues[':queryPrefix'] = input.normalizedQuery;
+      filterExpression = 'begins_with(normalizedName, :queryPrefix)';
+    }
+
+    const response = await this.ddb.send(
+      new QueryCommand({
+        TableName: this.cfg.tables.cards,
+        IndexName: 'gsi1',
+        KeyConditionExpression: 'gsi1pk = :gsi1pk',
+        FilterExpression: filterExpression,
+        ExpressionAttributeValues: expressionValues,
+        Limit: input.limit,
+        ExclusiveStartKey: input.exclusiveStartKey
+      })
+    );
+
+    const items = (response.Items ?? []).map((item) => toCardListItem(item as Record<string, unknown>));
+
+    const result: PaginatedItems<CardListItem> = {
+      items
+    };
+    if (response.LastEvaluatedKey) {
+      result.lastEvaluatedKey = response.LastEvaluatedKey as Record<string, unknown>;
+    }
+
+    return result;
+  }
+
+  async listCardsByNamePrefix(input: ListCardsByNamePrefixInput): Promise<PaginatedItems<CardListItem>> {
+    const firstLetter = input.normalizedQuery.charAt(0) || '#';
+
+    const response = await this.ddb.send(
+      new QueryCommand({
+        TableName: this.cfg.tables.cards,
+        IndexName: 'gsi2',
+        KeyConditionExpression: 'gsi2pk = :gsi2pk AND begins_with(gsi2sk, :gsi2Prefix)',
+        ExpressionAttributeValues: {
+          ':gsi2pk': `NAME#${firstLetter}`,
+          ':gsi2Prefix': `NAME#${input.normalizedQuery}`
+        },
+        Limit: input.limit,
+        ExclusiveStartKey: input.exclusiveStartKey
+      })
+    );
+
+    const items = (response.Items ?? []).map((item) => toCardListItem(item as Record<string, unknown>));
+
+    const result: PaginatedItems<CardListItem> = {
+      items
+    };
+    if (response.LastEvaluatedKey) {
+      result.lastEvaluatedKey = response.LastEvaluatedKey as Record<string, unknown>;
+    }
+
+    return result;
+  }
+
+  async getCardById(cardId: string): Promise<CardDetail | null> {
+    const response = await this.ddb.send(
+      new GetCommand({
+        TableName: this.cfg.tables.cards,
+        Key: {
+          pk: `CARD#${cardId}`,
+          sk: 'META'
+        }
+      })
+    );
+
+    if (!response.Item) {
+      return null;
+    }
+
+    return toCardDetail(response.Item as Record<string, unknown>);
+  }
+
+  async getLatestPrice(cardId: string): Promise<LatestPriceResponse | null> {
+    const response = await this.ddb.send(
+      new GetCommand({
+        TableName: this.cfg.tables.latestPrices,
+        Key: {
+          pk: `CARD#${cardId}`,
+          sk: 'LATEST'
+        }
+      })
+    );
+
+    if (!response.Item) {
+      return null;
+    }
+
+    return toLatestPrice(response.Item as Record<string, unknown>);
+  }
+
+  async getPriceHistory(cardId: string, fromIso: string, toIso: string): Promise<PriceHistoryPoint[]> {
+    const response = await this.ddb.send(
+      new QueryCommand({
+        TableName: this.cfg.tables.prices,
+        KeyConditionExpression: 'pk = :pk AND sk BETWEEN :from AND :to',
+        ExpressionAttributeValues: {
+          ':pk': `CARD#${cardId}`,
+          ':from': `TS#${fromIso}`,
+          ':to': `TS#${toIso}`
+        },
+        ScanIndexForward: true
+      })
+    );
+
+    return (response.Items ?? []).map((item) => toHistoryPoint(item as Record<string, unknown>));
+  }
+}

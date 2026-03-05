@@ -50,14 +50,26 @@ Error:
 
 ## Pagination
 - Query params: `limit`, `cursor`
-- `limit` default: `25`, max: `100`
-- `cursor` is opaque base64 token
+- `limit` default: `25`, max: `50`
+- `cursor` is opaque signed token (`payload.signature`, base64url)
+- Cursor payload (v1):
+  - `route` (must match endpoint)
+  - `index` (`gsi1` or `gsi2`)
+  - `params` (must match request `set`/`query`)
+  - `limit` (must match request `limit`)
+  - `lek` (DynamoDB LastEvaluatedKey)
 - Invalid cursor returns `400 INVALID_CURSOR`
 
 ## Endpoints
 
 ### GET /cards?query=&set=&limit=&cursor=
 Returns paginated card browse/search results.
+
+Validation:
+- At least one of `set` or `query` is required.
+- If `set` is omitted and `query` is provided: `query.length >= 2`.
+- If `set` is provided and `query` is provided: `query.length >= 1`.
+- `limit` must be between `1` and `50`.
 
 Success `200` sample:
 ```json
@@ -184,4 +196,5 @@ Cooldown:
 - `SIGNALS_NOT_FOUND`
 
 ## Changelog
+- v1 (March 4, 2026): Phase 2 updates: public cards/prices read endpoints implemented, limit capped at 50, signed context-aware cursor contract (`route/index/params/limit` validation).
 - v1 (March 4, 2026): Initial locked API contract with envelope + HTTP statuses, opaque cursors, idempotency header, and crossing-only alert semantics.

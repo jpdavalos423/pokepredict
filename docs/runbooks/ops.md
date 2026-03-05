@@ -41,3 +41,13 @@ Start the Step Functions state machine with input:
 ## Replay Guidance
 - Replays with identical `runId`/timestamp inputs should overwrite deterministic keys.
 - `LatestPrices` only updates when incoming `asOf` is newer.
+
+## Phase 2 API Smoke
+After deploy, verify:
+1. `GET /health`
+2. `GET /cards?set=<setId>&limit=25`
+3. `GET /cards?query=ch&limit=25`
+4. `GET /cards/<cardId>`
+5. `GET /cards/<cardId>/price/latest`
+6. `GET /cards/<cardId>/prices?range=30d`
+7. Cursor tamper check (`cursor` modified) returns `400 INVALID_CURSOR`.

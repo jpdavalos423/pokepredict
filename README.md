@@ -46,3 +46,11 @@ pnpm dev:cdk
 ## Notes
 - This phase intentionally includes placeholders only for API, pipeline, and infra behavior.
 - Feature implementation starts in Phase 1.
+
+## Phase 2
+- Public read endpoints are available via API Gateway:
+  - `/cards`
+  - `/cards/{cardId}`
+  - `/cards/{cardId}/price/latest`
+  - `/cards/{cardId}/prices?range=30d|90d|1y`
+- API requires `CURSOR_SIGNING_SECRET` in environment for cursor signing/validation.

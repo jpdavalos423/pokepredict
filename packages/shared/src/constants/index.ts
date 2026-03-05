@@ -1,5 +1,5 @@
 export const DEFAULT_PAGE_LIMIT = 25;
-export const MAX_PAGE_LIMIT = 100;
+export const MAX_PAGE_LIMIT = 50;
 
 export const PRICE_RANGES = ['30d', '90d', '1y'] as const;
 export type PriceRange = (typeof PRICE_RANGES)[number];

@@ -11,11 +11,14 @@ import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as targets from 'aws-cdk-lib/aws-events-targets';
+import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
+import * as apigatewayv2Integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import * as sfnTasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
 
 export interface PokepredictStackProps extends StackProps {
@@ -23,6 +26,8 @@ export interface PokepredictStackProps extends StackProps {
   stage: string;
   sourceName: string;
   ingestScheduleCron: string;
+  cursorSigningSecretParam: string;
+  cursorSigningSecretVersion: number;
 }
 
 export class PokepredictStack extends Stack {
@@ -103,18 +108,19 @@ export class PokepredictStack extends Stack {
       autoDeleteObjects: isDev
     });
 
-    const pipelineSrcPath = path.resolve(__dirname, '../../../apps/pipeline/src/handlers');
     const bundling: lambdaNodejs.BundlingOptions = {
       format: lambdaNodejs.OutputFormat.CJS,
       target: 'node22',
       sourceMap: false
     };
 
+    const pipelineSrcPath = path.resolve(__dirname, '../../../apps/pipeline/src/handlers');
     const startRunFunction = new lambdaNodejs.NodejsFunction(this, 'StartRunFunction', {
       runtime: lambda.Runtime.NODEJS_22_X,
       entry: path.join(pipelineSrcPath, 'startRun.ts'),
       handler: 'handler',
-      timeout: Duration.seconds(30)
+      timeout: Duration.seconds(30),
+      bundling
     });
 
     const fetchRawFunction = new lambdaNodejs.NodejsFunction(this, 'FetchRawFunction', {
@@ -147,11 +153,40 @@ export class PokepredictStack extends Stack {
       }
     });
 
+    const cursorSigningSecret = ssm.StringParameter.valueForSecureStringParameter(
+      this,
+      props.cursorSigningSecretParam,
+      props.cursorSigningSecretVersion
+    );
+
+    const apiSrcPath = path.resolve(__dirname, '../../../apps/api/src/handler.ts');
+    const apiFunction = new lambdaNodejs.NodejsFunction(this, 'ApiLambda', {
+      runtime: lambda.Runtime.NODEJS_22_X,
+      entry: apiSrcPath,
+      handler: 'handler',
+      timeout: Duration.seconds(15),
+      bundling,
+      environment: {
+        CURSOR_SIGNING_SECRET: cursorSigningSecret,
+        TABLE_CARDS: cardsTable.tableName,
+        TABLE_PRICES: pricesTable.tableName,
+        TABLE_LATEST_PRICES: latestPricesTable.tableName,
+        TABLE_HOLDINGS: holdingsTable.tableName,
+        TABLE_ALERTS_BY_USER: alertsByUserTable.tableName,
+        TABLE_ALERTS_BY_CARD: alertsByCardTable.tableName,
+        TABLE_SIGNALS: signalsTable.tableName
+      }
+    });
+
     rawBucket.grantWrite(fetchRawFunction);
     rawBucket.grantRead(normalizeFunction);
     cardsTable.grantReadData(normalizeFunction);
     pricesTable.grantReadWriteData(normalizeFunction);
     latestPricesTable.grantReadWriteData(normalizeFunction);
+
+    cardsTable.grantReadData(apiFunction);
+    pricesTable.grantReadData(apiFunction);
+    latestPricesTable.grantReadData(apiFunction);
 
     const startRunTask = new sfnTasks.LambdaInvoke(this, 'StartRun', {
       lambdaFunction: startRunFunction,
@@ -188,6 +223,54 @@ export class PokepredictStack extends Stack {
       ]
     });
 
+    const httpApi = new apigatewayv2.HttpApi(this, 'PublicApi', {
+      apiName: `${prefix}-public-api`,
+      createDefaultStage: true
+    });
+
+    const defaultStage = httpApi.defaultStage?.node.defaultChild as apigatewayv2.CfnStage | undefined;
+    if (defaultStage) {
+      defaultStage.defaultRouteSettings = {
+        throttlingBurstLimit: 100,
+        throttlingRateLimit: 50
+      };
+    }
+
+    const apiIntegration = new apigatewayv2Integrations.HttpLambdaIntegration(
+      'PublicApiIntegration',
+      apiFunction
+    );
+
+    httpApi.addRoutes({
+      path: '/health',
+      methods: [apigatewayv2.HttpMethod.GET],
+      integration: apiIntegration
+    });
+
+    httpApi.addRoutes({
+      path: '/cards',
+      methods: [apigatewayv2.HttpMethod.GET],
+      integration: apiIntegration
+    });
+
+    httpApi.addRoutes({
+      path: '/cards/{cardId}',
+      methods: [apigatewayv2.HttpMethod.GET],
+      integration: apiIntegration
+    });
+
+    httpApi.addRoutes({
+      path: '/cards/{cardId}/price/latest',
+      methods: [apigatewayv2.HttpMethod.GET],
+      integration: apiIntegration
+    });
+
+    httpApi.addRoutes({
+      path: '/cards/{cardId}/prices',
+      methods: [apigatewayv2.HttpMethod.GET],
+      integration: apiIntegration
+    });
+
     new cloudwatch.Alarm(this, 'StateMachineFailuresAlarm', {
       metric: stateMachine.metricFailed({
         period: Duration.minutes(5),
@@ -201,6 +284,23 @@ export class PokepredictStack extends Stack {
     this.createLambdaErrorAlarm('StartRunErrorsAlarm', startRunFunction);
     this.createLambdaErrorAlarm('FetchRawErrorsAlarm', fetchRawFunction);
     this.createLambdaErrorAlarm('NormalizeErrorsAlarm', normalizeFunction);
+    this.createLambdaErrorAlarm('ApiLambdaErrorsAlarm', apiFunction);
+
+    new cloudwatch.Alarm(this, 'Api5xxAlarm', {
+      metric: new cloudwatch.Metric({
+        namespace: 'AWS/ApiGateway',
+        metricName: '5xx',
+        dimensionsMap: {
+          ApiId: httpApi.httpApiId,
+          Stage: '$default'
+        },
+        statistic: 'sum',
+        period: Duration.minutes(5)
+      }),
+      threshold: 1,
+      evaluationPeriods: 1,
+      alarmDescription: 'Pokepredict public API 5XX responses exceeded threshold.'
+    });
 
     new CfnOutput(this, 'CardsTableName', { value: cardsTable.tableName });
     new CfnOutput(this, 'PricesTableName', { value: pricesTable.tableName });
@@ -212,6 +312,8 @@ export class PokepredictStack extends Stack {
     new CfnOutput(this, 'RawBucketName', { value: rawBucket.bucketName });
     new CfnOutput(this, 'IngestionStateMachineArn', { value: stateMachine.stateMachineArn });
     new CfnOutput(this, 'IngestionScheduleExpression', { value: props.ingestScheduleCron });
+    new CfnOutput(this, 'ApiBaseUrl', { value: httpApi.apiEndpoint });
+    new CfnOutput(this, 'ApiLambdaName', { value: apiFunction.functionName });
   }
 
   private createTable(

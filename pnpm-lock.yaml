@@ -44,6 +44,12 @@ importers:
 
   apps/api:
     dependencies:
+      '@aws-sdk/client-dynamodb':
+        specifier: ^3.916.0
+        version: 3.1002.0
+      '@aws-sdk/lib-dynamodb':
+        specifier: ^3.916.0
+        version: 3.1002.0(@aws-sdk/client-dynamodb@3.1002.0)
       '@pokepredict/shared':
         specifier: workspace:*
         version: link:../../packages/shared

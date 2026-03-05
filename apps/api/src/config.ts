@@ -1,5 +1,6 @@
 export interface ApiConfig {
   awsRegion: string;
+  cursorSigningSecret: string;
   tables: {
     cards: string;
     prices: string;
@@ -22,6 +23,7 @@ function required(name: string): string {
 export function loadApiConfig(): ApiConfig {
   return {
     awsRegion: required('AWS_REGION'),
+    cursorSigningSecret: required('CURSOR_SIGNING_SECRET'),
     tables: {
       cards: required('TABLE_CARDS'),
       prices: required('TABLE_PRICES'),

@@ -32,7 +32,8 @@ GSIs:
 Access patterns:
 - Get card by id: `GetItem`
 - Browse by set: `Query` GSI1
-- MVP prefix search: `Query` GSI2 + optional filter
+- Prefix search (query-only): `Query` GSI2 (`NAME#<firstLetter>` + `begins_with(gsi2sk, NAME#<normalizedQuery>)`)
+- Set + query narrowing: `Query` GSI1 with `begins_with(normalizedName, <normalizedQuery>)` filter
 
 ### Prices
 Primary key:
@@ -144,4 +145,5 @@ Access patterns:
 - Latest price read may use strong consistency when user-facing freshness is critical.
 
 ## Changelog
+- v1 (March 4, 2026): Phase 2 clarifications for no-scan card read paths (`GSI2` prefix search and `GSI1` set+query narrowing filter).
 - v1 (March 4, 2026): Initial locked Phase 0 model with multi-table strategy, opaque IDs, and access-pattern mapping.
