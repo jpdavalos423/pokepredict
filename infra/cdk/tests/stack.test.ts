@@ -22,7 +22,7 @@ describe('Phase 2 stack', () => {
     template.resourceCountIs('AWS::Events::Rule', 1);
     template.resourceCountIs('AWS::Lambda::Function', 5);
     template.resourceCountIs('AWS::ApiGatewayV2::Api', 1);
-    template.resourceCountIs('AWS::ApiGatewayV2::Route', 5);
+    template.resourceCountIs('AWS::ApiGatewayV2::Route', 8);
     template.resourceCountIs('AWS::CloudWatch::Alarm', 6);
 
     template.hasResourceProperties('AWS::Lambda::Function', {
@@ -69,10 +69,32 @@ describe('Phase 2 stack', () => {
       RouteKey: 'GET /cards/{cardId}/price/latest'
     });
 
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'GET /portfolio'
+    });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'POST /portfolio/holdings'
+    });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'DELETE /portfolio/holdings/{holdingId}'
+    });
+
     template.hasResourceProperties('AWS::ApiGatewayV2::Stage', {
       DefaultRouteSettings: {
         ThrottlingBurstLimit: 100,
         ThrottlingRateLimit: 50
+      }
+    });
+
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: Match.arrayWith(['dynamodb:PutItem', 'dynamodb:DeleteItem'])
+          })
+        ])
       }
     });
 

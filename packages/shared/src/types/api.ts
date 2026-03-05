@@ -1,6 +1,6 @@
 import type { ErrorCode } from '../errors/error-codes';
 import type { PriceRange } from '../constants';
-import type { Card } from './entities';
+import type { Card, HoldingCondition, HoldingVariant } from './entities';
 
 export interface ApiErrorShape {
   code: ErrorCode;
@@ -90,4 +90,44 @@ export interface PriceHistoryResponse {
   from: string;
   to: string;
   points: PriceHistoryPoint[];
+}
+
+export interface CreateHoldingRequest {
+  cardId: string;
+  qty: number;
+  variant: HoldingVariant;
+  grade: string | null;
+  condition: HoldingCondition;
+  buyPriceCents: number;
+  buyDate: string;
+  notes?: string | undefined;
+}
+
+export interface HoldingResponse extends CreateHoldingRequest {
+  holdingId: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+  requestHash?: string | undefined;
+}
+
+export interface PortfolioHoldingValuation extends HoldingResponse {
+  costBasisCents: number;
+  marketValueCents: number;
+  unrealizedPnLCents: number;
+  unrealizedPnLBps: number;
+  latestPrice: LatestPriceResponse | null;
+}
+
+export interface PortfolioSummary {
+  totalCostBasisCents: number;
+  totalMarketValueCents: number;
+  unrealizedPnLCents: number;
+  unrealizedPnLBps: number;
+}
+
+export interface PortfolioResponse {
+  summary: PortfolioSummary;
+  holdings: PortfolioHoldingValuation[];
 }

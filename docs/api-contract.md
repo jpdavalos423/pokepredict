@@ -1,7 +1,7 @@
 # Pokepredict API Contract
 
 Version: v1  
-Last Updated: March 4, 2026
+Last Updated: March 5, 2026
 
 Base: API Gateway HTTP API
 
@@ -115,6 +115,9 @@ Auth: `x-user-id`
 Success shape:
 - `summary`: `totalCostBasisCents`, `totalMarketValueCents`, `unrealizedPnLCents`, `unrealizedPnLBps`
 - `holdings`: list of user holdings with computed valuation fields
+- Holding order is `createdAt` descending
+- No pagination in Phase 3
+- Missing latest price returns `latestPrice: null` and contributes `0` to `marketValueCents`
 
 ### POST /portfolio/holdings
 Auth: `x-user-id`
@@ -135,14 +138,16 @@ Request sample:
 
 Behavior:
 - Returns `201` with generated opaque `holdingId`
-- Repeated request with same `Idempotency-Key` returns same created resource
+- Same `x-user-id` + same `Idempotency-Key` + same payload returns the same resource with `201` and does not create a duplicate row
+- Same `x-user-id` + same `Idempotency-Key` + different payload returns `409 IDEMPOTENCY_CONFLICT`
+- Without `Idempotency-Key`, normal create path still returns `201`
 
 ### DELETE /portfolio/holdings/{holdingId}
 Auth: `x-user-id`
 
 Behavior:
 - `204` on success
-- `404` when holding does not exist for user
+- `404 HOLDING_NOT_FOUND` when holding does not exist for user
 
 ### GET /alerts
 Auth: `x-user-id`
@@ -194,7 +199,10 @@ Cooldown:
 - `CARD_NOT_FOUND`
 - `PRICE_NOT_FOUND`
 - `SIGNALS_NOT_FOUND`
+- `HOLDING_NOT_FOUND`
+- `IDEMPOTENCY_CONFLICT`
 
 ## Changelog
+- v1 (March 5, 2026): Phase 3 portfolio contract finalized: `GET /portfolio`, `POST /portfolio/holdings`, `DELETE /portfolio/holdings/{holdingId}`, idempotency conflict semantics, and zero-market-value behavior for missing latest prices.
 - v1 (March 4, 2026): Phase 2 updates: public cards/prices read endpoints implemented, limit capped at 50, signed context-aware cursor contract (`route/index/params/limit` validation).
 - v1 (March 4, 2026): Initial locked API contract with envelope + HTTP statuses, opaque cursors, idempotency header, and crossing-only alert semantics.

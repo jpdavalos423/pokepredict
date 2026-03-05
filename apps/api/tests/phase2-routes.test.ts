@@ -1,6 +1,7 @@
 import { encodeCursor, type CardDetail, type CardListItem, type LatestPriceResponse, type PriceHistoryPoint } from '@pokepredict/shared';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { describe, expect, it, vi } from 'vitest';
+import type { PortfolioRepository } from '../src/data/portfolio-repository';
 import { type ApiDependencies } from '../src/dependencies';
 import type { ApiReadRepository, PaginatedItems } from '../src/data/read-repository';
 import { createHandler } from '../src/handler';
@@ -57,11 +58,24 @@ function createRepoMock(): ApiReadRepository {
   };
 }
 
+function createPortfolioRepoMock(): PortfolioRepository {
+  return {
+    createHolding: vi.fn(async () => {}),
+    createHoldingWithIdempotency: vi.fn(async () => {}),
+    getHolding: vi.fn(async () => null),
+    deleteHolding: vi.fn(async () => {}),
+    getIdempotencyAlias: vi.fn(async () => null),
+    listHoldingsByUser: vi.fn(async () => []),
+    batchGetLatestPrices: vi.fn(async () => new Map())
+  };
+}
+
 function createTestHandler(repo: ApiReadRepository) {
   return createHandler(
     () =>
       ({
         repo,
+        portfolioRepo: createPortfolioRepoMock(),
         cursorSigningSecret: CURSOR_SECRET,
         now: () => new Date('2026-03-04T18:00:00.000Z')
       }) satisfies ApiDependencies
@@ -91,9 +105,7 @@ describe('Phase 2 API routes', () => {
     expect(body.data.cursor).toBeNull();
     expect(repo.listCardsBySet).toHaveBeenCalledWith({
       setId: 'sv3',
-      normalizedQuery: undefined,
-      limit: 25,
-      exclusiveStartKey: undefined
+      limit: 25
     });
   });
 
@@ -114,8 +126,7 @@ describe('Phase 2 API routes', () => {
 
     expect(repo.listCardsByNamePrefix).toHaveBeenCalledWith({
       normalizedQuery: 'char',
-      limit: 25,
-      exclusiveStartKey: undefined
+      limit: 25
     });
   });
 
@@ -129,8 +140,7 @@ describe('Phase 2 API routes', () => {
     expect(repo.listCardsBySet).toHaveBeenCalledWith({
       setId: 'sv3',
       normalizedQuery: 'a',
-      limit: 25,
-      exclusiveStartKey: undefined
+      limit: 25
     });
   });
 
@@ -153,6 +163,7 @@ describe('Phase 2 API routes', () => {
       }
       return {
         repo,
+        portfolioRepo: createPortfolioRepoMock(),
         cursorSigningSecret: CURSOR_SECRET,
         now: () => new Date('2026-03-04T18:00:00.000Z')
       };
@@ -218,7 +229,6 @@ describe('Phase 2 API routes', () => {
     expect(second.statusCode).toBe(200);
     expect(repo.listCardsBySet).toHaveBeenNthCalledWith(2, {
       setId: 'sv3',
-      normalizedQuery: undefined,
       limit: 2,
       exclusiveStartKey: {
         pk: 'CARD#sv3-198',

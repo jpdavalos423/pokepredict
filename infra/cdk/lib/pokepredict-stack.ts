@@ -182,6 +182,7 @@ export class PokepredictStack extends Stack {
     cardsTable.grantReadData(apiFunction);
     pricesTable.grantReadData(apiFunction);
     latestPricesTable.grantReadData(apiFunction);
+    holdingsTable.grantReadWriteData(apiFunction);
 
     const region = Stack.of(this).region;
     const account = Stack.of(this).account;
@@ -272,6 +273,24 @@ export class PokepredictStack extends Stack {
     httpApi.addRoutes({
       path: '/cards/{cardId}/prices',
       methods: [apigatewayv2.HttpMethod.GET],
+      integration: apiIntegration
+    });
+
+    httpApi.addRoutes({
+      path: '/portfolio',
+      methods: [apigatewayv2.HttpMethod.GET],
+      integration: apiIntegration
+    });
+
+    httpApi.addRoutes({
+      path: '/portfolio/holdings',
+      methods: [apigatewayv2.HttpMethod.POST],
+      integration: apiIntegration
+    });
+
+    httpApi.addRoutes({
+      path: '/portfolio/holdings/{holdingId}',
+      methods: [apigatewayv2.HttpMethod.DELETE],
       integration: apiIntegration
     });
 

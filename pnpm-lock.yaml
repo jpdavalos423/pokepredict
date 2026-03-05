@@ -56,6 +56,9 @@ importers:
       '@pokepredict/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      ulid:
+        specifier: ^3.0.1
+        version: 3.0.2
     devDependencies:
       '@types/aws-lambda':
         specifier: ^8.10.152

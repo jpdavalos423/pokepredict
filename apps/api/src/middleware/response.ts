@@ -14,6 +14,12 @@ export function jsonResponse(
   };
 }
 
+export function noContentResponse(): APIGatewayProxyResultV2 {
+  return {
+    statusCode: 204
+  };
+}
+
 export function errorResponse(
   error: unknown,
   requestId: string

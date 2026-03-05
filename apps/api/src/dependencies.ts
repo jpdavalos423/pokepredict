@@ -3,10 +3,15 @@ import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import type { ApiConfig } from './config';
 import { loadApiConfig } from './config';
+import {
+  type PortfolioRepository,
+  DynamoPortfolioRepository
+} from './data/portfolio-repository';
 import { type ApiReadRepository, DynamoApiReadRepository } from './data/read-repository';
 
 export interface ApiDependencies {
   repo: ApiReadRepository;
+  portfolioRepo: PortfolioRepository;
   cursorSigningSecret: string;
   now: () => Date;
 }
@@ -48,6 +53,7 @@ export async function createApiDependencies(
 
   return {
     repo: new DynamoApiReadRepository(ddb, config),
+    portfolioRepo: new DynamoPortfolioRepository(ddb, config),
     cursorSigningSecret,
     now: () => new Date()
   };

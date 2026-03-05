@@ -1,7 +1,7 @@
 # Pokepredict Data Model
 
 Version: v1  
-Last Updated: March 4, 2026
+Last Updated: March 5, 2026
 
 ## Key Conventions
 - Card partition key prefix: `CARD#<cardId>`
@@ -71,6 +71,7 @@ Primary key:
 Attributes:
 - `holdingId`, `userId`, `cardId`, `qty`, `variant`, `grade`, `condition`
 - `buyPriceCents`, `buyDate`, `notes`
+- optional `requestHash` (present when idempotency key is used)
 - `createdAt`, `updatedAt`, `version`
 
 Access patterns:
@@ -79,6 +80,16 @@ Access patterns:
 
 ID policy:
 - `holdingId` is opaque and server-generated (ULID or UUID).
+
+Idempotency alias records (same `Holdings` table):
+- `pk = USER#<userId>`
+- `sk = IDEMP#<idempotencyKey>`
+- Attributes: `holdingId`, `requestHash`, `createdAt`, `updatedAt`, `version`, `entityType=IDEMP`
+
+Create semantics with idempotency:
+- `POST /portfolio/holdings` with `Idempotency-Key` uses `TransactWriteItems` to write both `HOLDING#` and `IDEMP#` items
+- Replayed same-key same-payload resolves via alias lookup and returns original holding
+- Replayed same-key different-payload returns `409 IDEMPOTENCY_CONFLICT`
 
 ### AlertsByUser
 Primary key:
@@ -128,7 +139,7 @@ Access patterns:
 - `GET /cards/{cardId}/prices`: `Prices.Query`
 - `GET /cards/{cardId}/signals/latest`: `Signals.Query` reverse + 1
 - `GET /portfolio`: `Holdings.Query` + `LatestPrices.BatchGetItem`
-- `POST /portfolio/holdings`: `Holdings.PutItem` (idempotent on key)
+- `POST /portfolio/holdings`: `Holdings.PutItem` or transactional `Put(HOLDING#) + Put(IDEMP#)` when `Idempotency-Key` is present
 - `DELETE /portfolio/holdings/{holdingId}`: `Holdings.DeleteItem`
 - `GET /alerts`: `AlertsByUser.Query`
 - `POST /alerts`: transactional dual write (`AlertsByUser` + `AlertsByCard`)
@@ -138,12 +149,13 @@ Access patterns:
 ## Idempotency and Replay
 - Pipeline execution includes `runId` and writes `runId` to derived records.
 - Replaying a run with same timestamps is safe (same primary keys overwrite deterministically).
-- Create APIs support `Idempotency-Key` at contract level; persistence strategy is implemented in Phase 1+.
+- Portfolio create idempotency is persisted in `Holdings` alias records (`IDEMP#<idempotencyKey>`) with payload hash checks.
 
 ## Read Consistency
 - Default eventual consistency for list/history operations.
 - Latest price read may use strong consistency when user-facing freshness is critical.
 
 ## Changelog
+- v1 (March 5, 2026): Phase 3 updates: holdings idempotency alias record pattern (`IDEMP#`) and transactional create semantics for portfolio holdings.
 - v1 (March 4, 2026): Phase 2 clarifications for no-scan card read paths (`GSI2` prefix search and `GSI1` set+query narrowing filter).
 - v1 (March 4, 2026): Initial locked Phase 0 model with multi-table strategy, opaque IDs, and access-pattern mapping.
