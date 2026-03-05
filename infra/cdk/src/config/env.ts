@@ -6,25 +6,10 @@ export interface CdkEnvConfig {
   sourceName: string;
   ingestScheduleCron: string;
   cursorSigningSecretParam: string;
-  cursorSigningSecretVersion: number;
 }
 
 function readOrDefault(name: string, fallback: string): string {
   return process.env[name] ?? fallback;
-}
-
-function readNumberOrDefault(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) {
-    return fallback;
-  }
-
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    throw new Error(`${name} must be a positive integer.`);
-  }
-
-  return parsed;
 }
 
 export function loadCdkEnvConfig(): CdkEnvConfig {
@@ -39,7 +24,6 @@ export function loadCdkEnvConfig(): CdkEnvConfig {
     cursorSigningSecretParam: readOrDefault(
       'CURSOR_SIGNING_SECRET_PARAM',
       `/pokepredict/${stage}/cursor-signing-secret`
-    ),
-    cursorSigningSecretVersion: readNumberOrDefault('CURSOR_SIGNING_SECRET_VERSION', 1)
+    )
   };
 }

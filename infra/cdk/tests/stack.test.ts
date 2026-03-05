@@ -32,7 +32,7 @@ describe('Phase 2 stack', () => {
     template.hasResourceProperties('AWS::Lambda::Function', {
       Environment: {
         Variables: Match.objectLike({
-          CURSOR_SIGNING_SECRET: Match.anyValue(),
+          CURSOR_SIGNING_SECRET_PARAM: '/pokepredict/dev/cursor-signing-secret',
           TABLE_CARDS: Match.anyValue(),
           TABLE_PRICES: Match.anyValue(),
           TABLE_LATEST_PRICES: Match.anyValue()

@@ -16,6 +16,6 @@ new PokepredictStack(app, `${cfg.project}-${cfg.stage}-stack`, {
   sourceName: cfg.sourceName,
   ingestScheduleCron: cfg.ingestScheduleCron,
   cursorSigningSecretParam: cfg.cursorSigningSecretParam,
-  cursorSigningSecretVersion: cfg.cursorSigningSecretVersion,
+  cursorSigningSecretVersion: 1,
   description: 'PokePredict Phase 2 data platform and public API stack.'
 });

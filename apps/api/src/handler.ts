@@ -9,7 +9,7 @@ import { healthRoute } from './routes/health';
 import { priceHistoryRoute } from './routes/prices/history';
 import { latestPriceRoute } from './routes/prices/latest';
 
-type DependenciesFactory = () => ApiDependencies;
+type DependenciesFactory = () => ApiDependencies | Promise<ApiDependencies>;
 
 function decodePathSegment(value: string): string {
   try {
@@ -20,13 +20,16 @@ function decodePathSegment(value: string): string {
 }
 
 export function createHandler(factory: DependenciesFactory = createApiDependencies) {
-  let deps: ApiDependencies | undefined;
+  let depsPromise: Promise<ApiDependencies> | undefined;
 
-  function getDeps(): ApiDependencies {
-    if (!deps) {
-      deps = factory();
+  async function getDeps(): Promise<ApiDependencies> {
+    if (!depsPromise) {
+      depsPromise = Promise.resolve(factory()).catch((error) => {
+        depsPromise = undefined;
+        throw error;
+      });
     }
-    return deps;
+    return depsPromise;
   }
 
   return async function apiHandler(
@@ -40,23 +43,23 @@ export function createHandler(factory: DependenciesFactory = createApiDependenci
       }
 
       if (req.method === 'GET' && req.path === '/cards') {
-        return await listCardsRoute(req, getDeps());
+        return await listCardsRoute(req, await getDeps());
       }
 
       if (req.method === 'GET') {
         const latestMatch = req.path.match(/^\/cards\/([^/]+)\/price\/latest$/);
         if (latestMatch?.[1]) {
-          return await latestPriceRoute(decodePathSegment(latestMatch[1]), getDeps());
+          return await latestPriceRoute(decodePathSegment(latestMatch[1]), await getDeps());
         }
 
         const historyMatch = req.path.match(/^\/cards\/([^/]+)\/prices$/);
         if (historyMatch?.[1]) {
-          return await priceHistoryRoute(req, decodePathSegment(historyMatch[1]), getDeps());
+          return await priceHistoryRoute(req, decodePathSegment(historyMatch[1]), await getDeps());
         }
 
         const cardMatch = req.path.match(/^\/cards\/([^/]+)$/);
         if (cardMatch?.[1]) {
-          return await getCardByIdRoute(decodePathSegment(cardMatch[1]), getDeps());
+          return await getCardByIdRoute(decodePathSegment(cardMatch[1]), await getDeps());
         }
       }
 

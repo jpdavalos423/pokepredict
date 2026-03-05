@@ -143,6 +143,29 @@ describe('Phase 2 API routes', () => {
     expect(body.error?.code).toBe('VALIDATION_ERROR');
   });
 
+  it('retries dependency initialization after a transient failure', async () => {
+    const repo = createRepoMock();
+    let attempts = 0;
+    const handler = createHandler(async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new Error('temporary ssm failure');
+      }
+      return {
+        repo,
+        cursorSigningSecret: CURSOR_SECRET,
+        now: () => new Date('2026-03-04T18:00:00.000Z')
+      };
+    });
+
+    const first = await handler(createEvent('/cards', { set: 'sv3' }));
+    expect(first.statusCode).toBe(500);
+
+    const second = await handler(createEvent('/cards', { set: 'sv3' }));
+    expect(second.statusCode).toBe(200);
+    expect(attempts).toBe(2);
+  });
+
   it('GET /cards rejects limit > 50', async () => {
     const handler = createTestHandler(createRepoMock());
     const result = await handler(createEvent('/cards', { set: 'sv3', limit: '51' }));

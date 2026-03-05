@@ -18,7 +18,7 @@ import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import * as sfnTasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
-import * as ssm from 'aws-cdk-lib/aws-ssm';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import type { Construct } from 'constructs';
 
 export interface PokepredictStackProps extends StackProps {
@@ -153,12 +153,6 @@ export class PokepredictStack extends Stack {
       }
     });
 
-    const cursorSigningSecret = ssm.StringParameter.valueForSecureStringParameter(
-      this,
-      props.cursorSigningSecretParam,
-      props.cursorSigningSecretVersion
-    );
-
     const apiSrcPath = path.resolve(__dirname, '../../../apps/api/src/handler.ts');
     const apiFunction = new lambdaNodejs.NodejsFunction(this, 'ApiLambda', {
       runtime: lambda.Runtime.NODEJS_22_X,
@@ -167,7 +161,8 @@ export class PokepredictStack extends Stack {
       timeout: Duration.seconds(15),
       bundling,
       environment: {
-        CURSOR_SIGNING_SECRET: cursorSigningSecret,
+        CURSOR_SIGNING_SECRET_PARAM: props.cursorSigningSecretParam,
+        CURSOR_SIGNING_SECRET_VERSION: String(props.cursorSigningSecretVersion),
         TABLE_CARDS: cardsTable.tableName,
         TABLE_PRICES: pricesTable.tableName,
         TABLE_LATEST_PRICES: latestPricesTable.tableName,
@@ -187,6 +182,15 @@ export class PokepredictStack extends Stack {
     cardsTable.grantReadData(apiFunction);
     pricesTable.grantReadData(apiFunction);
     latestPricesTable.grantReadData(apiFunction);
+
+    const region = Stack.of(this).region;
+    const account = Stack.of(this).account;
+    apiFunction.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['ssm:GetParameter'],
+      resources: [
+        `arn:aws:ssm:${region}:${account}:parameter${props.cursorSigningSecretParam}`
+      ]
+    }));
 
     const startRunTask = new sfnTasks.LambdaInvoke(this, 'StartRun', {
       lambdaFunction: startRunFunction,
