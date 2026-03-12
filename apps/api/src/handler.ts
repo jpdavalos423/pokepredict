@@ -11,6 +11,7 @@ import { deleteHoldingRoute } from './routes/portfolio/deleteHolding';
 import { getPortfolioRoute } from './routes/portfolio/getPortfolio';
 import { priceHistoryRoute } from './routes/prices/history';
 import { latestPriceRoute } from './routes/prices/latest';
+import { latestSignalRoute } from './routes/signals/latest';
 
 type DependenciesFactory = () => ApiDependencies | Promise<ApiDependencies>;
 
@@ -66,6 +67,11 @@ export function createHandler(factory: DependenciesFactory = createApiDependenci
         const historyMatch = req.path.match(/^\/cards\/([^/]+)\/prices$/);
         if (historyMatch?.[1]) {
           return await priceHistoryRoute(req, decodePathSegment(historyMatch[1]), await getDeps());
+        }
+
+        const signalsMatch = req.path.match(/^\/cards\/([^/]+)\/signals\/latest$/);
+        if (signalsMatch?.[1]) {
+          return await latestSignalRoute(decodePathSegment(signalsMatch[1]), await getDeps());
         }
 
         const cardMatch = req.path.match(/^\/cards\/([^/]+)$/);

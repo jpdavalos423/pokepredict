@@ -1,7 +1,7 @@
 # Pokepredict API Contract
 
 Version: v1  
-Last Updated: March 5, 2026
+Last Updated: March 6, 2026
 
 Base: API Gateway HTTP API
 
@@ -109,6 +109,22 @@ Returns ordered time-series points.
 Returns latest signals record.
 - `404 SIGNALS_NOT_FOUND` if no signal exists yet.
 
+Success `200` sample:
+```json
+{
+  "ok": true,
+  "data": {
+    "cardId": "sv3-198",
+    "asOfDate": "2026-03-06",
+    "ret7dBps": 120,
+    "ret30dBps": 410,
+    "vol30dBps": 235,
+    "trend": "UPTREND"
+  },
+  "error": null
+}
+```
+
 ### GET /portfolio
 Auth: `x-user-id`
 
@@ -203,6 +219,7 @@ Cooldown:
 - `IDEMPOTENCY_CONFLICT`
 
 ## Changelog
+- v1 (March 6, 2026): Phase 4 updates: implemented `GET /cards/{cardId}/signals/latest` backed by persisted `Signals` records from pipeline `ComputeSignals`.
 - v1 (March 5, 2026): Phase 3 portfolio contract finalized: `GET /portfolio`, `POST /portfolio/holdings`, `DELETE /portfolio/holdings/{holdingId}`, idempotency conflict semantics, and zero-market-value behavior for missing latest prices.
 - v1 (March 4, 2026): Phase 2 updates: public cards/prices read endpoints implemented, limit capped at 50, signed context-aware cursor contract (`route/index/params/limit` validation).
 - v1 (March 4, 2026): Initial locked API contract with envelope + HTTP statuses, opaque cursors, idempotency header, and crossing-only alert semantics.

@@ -9,7 +9,7 @@
 - Alerts delivery: SES (Phase 5)
 - IaC: AWS CDK in `infra/cdk`
 
-## Implemented Phase 1 Data Flow
+## Implemented Pipeline Data Flow (Phase 1 + Phase 4)
 1. EventBridge schedule triggers Step Functions with fixed input:
    - `source=fixture`
    - `mode=scheduled`
@@ -21,9 +21,10 @@
 4. `Normalize` reads raw payload, maps to canonical card IDs from `Cards`, and writes:
    - `Prices` time-series points
    - `LatestPrices` snapshots guarded by newer `asOf`
+5. `ComputeSignals` reads recent `Prices` for updated cards and upserts daily `Signals`:
+   - `ret7dBps`, `ret30dBps`, `vol30dBps`, `trend`
 
 ## Planned Later Steps
-- `ComputeSignals` (Phase 4)
 - `AlertsEval` + SES notifications (Phase 5)
 
 ## Operational Baseline

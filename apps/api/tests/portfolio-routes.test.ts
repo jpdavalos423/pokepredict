@@ -63,7 +63,8 @@ function createReadRepoMock(): ApiReadRepository {
       number: '198'
     })),
     getLatestPrice: vi.fn(async (): Promise<LatestPriceResponse | null> => null),
-    getPriceHistory: vi.fn(async () => [])
+    getPriceHistory: vi.fn(async () => []),
+    getLatestSignal: vi.fn(async () => null)
   };
 }
 

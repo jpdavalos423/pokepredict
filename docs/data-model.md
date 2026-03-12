@@ -1,7 +1,7 @@
 # Pokepredict Data Model
 
 Version: v1  
-Last Updated: March 5, 2026
+Last Updated: March 6, 2026
 
 ## Key Conventions
 - Card partition key prefix: `CARD#<cardId>`
@@ -125,12 +125,17 @@ Primary key:
 
 Attributes:
 - `cardId`, `asOfDate`, `ret7dBps`, `ret30dBps`, `vol30dBps`, `trend`
+- `runId`, `source`
 - Optional future fields: `pred7dLowBps`, `pred7dHighBps`
 - `createdAt`, `updatedAt`, `version`
 
 Access patterns:
 - Latest signals: reverse `Query` + `Limit 1`
 - Historical signals: bounded `Query`
+
+Write rule:
+- Upsert by deterministic key (`CARD#<cardId>`, `ASOF#<YYYY-MM-DD>`) from `ComputeSignals` after `Normalize`.
+- Replay for same card/date overwrites the same logical record key (no duplicate logical row).
 
 ## Access Pattern Matrix
 - `GET /cards`: GSI-backed query (`Cards`)
@@ -156,6 +161,7 @@ Access patterns:
 - Latest price read may use strong consistency when user-facing freshness is critical.
 
 ## Changelog
+- v1 (March 6, 2026): Phase 4 updates: concrete Signals write semantics from pipeline `ComputeSignals`, plus `runId`/`source` traceability attributes.
 - v1 (March 5, 2026): Phase 3 updates: holdings idempotency alias record pattern (`IDEMP#`) and transactional create semantics for portfolio holdings.
 - v1 (March 4, 2026): Phase 2 clarifications for no-scan card read paths (`GSI2` prefix search and `GSI1` set+query narrowing filter).
 - v1 (March 4, 2026): Initial locked Phase 0 model with multi-table strategy, opaque IDs, and access-pattern mapping.

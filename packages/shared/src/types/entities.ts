@@ -129,4 +129,9 @@ export interface NormalizeResult extends StartRunResult {
   updatedCardIds: string[];
 }
 
+export interface ComputeSignalsResult extends StartRunResult {
+  processedCount: number;
+  updatedCardIds: string[];
+}
+
 export type PipelineEventContext = StartRunResult;

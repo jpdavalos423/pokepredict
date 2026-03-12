@@ -134,7 +134,8 @@ export class PokepredictStack extends Stack {
         SOURCE_NAME: props.sourceName,
         TABLE_CARDS: cardsTable.tableName,
         TABLE_PRICES: pricesTable.tableName,
-        TABLE_LATEST_PRICES: latestPricesTable.tableName
+        TABLE_LATEST_PRICES: latestPricesTable.tableName,
+        TABLE_SIGNALS: signalsTable.tableName
       }
     });
 
@@ -149,7 +150,24 @@ export class PokepredictStack extends Stack {
         SOURCE_NAME: props.sourceName,
         TABLE_CARDS: cardsTable.tableName,
         TABLE_PRICES: pricesTable.tableName,
-        TABLE_LATEST_PRICES: latestPricesTable.tableName
+        TABLE_LATEST_PRICES: latestPricesTable.tableName,
+        TABLE_SIGNALS: signalsTable.tableName
+      }
+    });
+
+    const computeSignalsFunction = new lambdaNodejs.NodejsFunction(this, 'ComputeSignalsFunction', {
+      runtime: lambda.Runtime.NODEJS_22_X,
+      entry: path.join(pipelineSrcPath, 'computeSignals.ts'),
+      handler: 'handler',
+      timeout: Duration.seconds(120),
+      bundling,
+      environment: {
+        RAW_BUCKET: rawBucket.bucketName,
+        SOURCE_NAME: props.sourceName,
+        TABLE_CARDS: cardsTable.tableName,
+        TABLE_PRICES: pricesTable.tableName,
+        TABLE_LATEST_PRICES: latestPricesTable.tableName,
+        TABLE_SIGNALS: signalsTable.tableName
       }
     });
 
@@ -178,11 +196,14 @@ export class PokepredictStack extends Stack {
     cardsTable.grantReadData(normalizeFunction);
     pricesTable.grantReadWriteData(normalizeFunction);
     latestPricesTable.grantReadWriteData(normalizeFunction);
+    pricesTable.grantReadData(computeSignalsFunction);
+    signalsTable.grantWriteData(computeSignalsFunction);
 
     cardsTable.grantReadData(apiFunction);
     pricesTable.grantReadData(apiFunction);
     latestPricesTable.grantReadData(apiFunction);
     holdingsTable.grantReadWriteData(apiFunction);
+    signalsTable.grantReadData(apiFunction);
 
     const region = Stack.of(this).region;
     const account = Stack.of(this).account;
@@ -208,7 +229,12 @@ export class PokepredictStack extends Stack {
       payloadResponseOnly: true
     });
 
-    const definition = startRunTask.next(fetchRawTask).next(normalizeTask);
+    const computeSignalsTask = new sfnTasks.LambdaInvoke(this, 'ComputeSignals', {
+      lambdaFunction: computeSignalsFunction,
+      payloadResponseOnly: true
+    });
+
+    const definition = startRunTask.next(fetchRawTask).next(normalizeTask).next(computeSignalsTask);
 
     const stateMachine = new sfn.StateMachine(this, 'IngestionStateMachine', {
       stateMachineName: `${prefix}-ingestion`,
@@ -277,6 +303,12 @@ export class PokepredictStack extends Stack {
     });
 
     httpApi.addRoutes({
+      path: '/cards/{cardId}/signals/latest',
+      methods: [apigatewayv2.HttpMethod.GET],
+      integration: apiIntegration
+    });
+
+    httpApi.addRoutes({
       path: '/portfolio',
       methods: [apigatewayv2.HttpMethod.GET],
       integration: apiIntegration
@@ -307,6 +339,7 @@ export class PokepredictStack extends Stack {
     this.createLambdaErrorAlarm('StartRunErrorsAlarm', startRunFunction);
     this.createLambdaErrorAlarm('FetchRawErrorsAlarm', fetchRawFunction);
     this.createLambdaErrorAlarm('NormalizeErrorsAlarm', normalizeFunction);
+    this.createLambdaErrorAlarm('ComputeSignalsErrorsAlarm', computeSignalsFunction);
     this.createLambdaErrorAlarm('ApiLambdaErrorsAlarm', apiFunction);
 
     new cloudwatch.Alarm(this, 'Api5xxAlarm', {

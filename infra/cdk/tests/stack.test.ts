@@ -3,7 +3,7 @@ import { Match, Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it } from 'vitest';
 import { PokepredictStack } from '../lib/pokepredict-stack';
 
-describe('Phase 2 stack', () => {
+describe('Phase 4 stack', () => {
   it('creates pipeline + public API resources with alarms and outputs', () => {
     const app = new App();
     const stack = new PokepredictStack(app, 'test-stack', {
@@ -20,10 +20,10 @@ describe('Phase 2 stack', () => {
     template.resourceCountIs('AWS::DynamoDB::Table', 7);
     template.resourceCountIs('AWS::StepFunctions::StateMachine', 1);
     template.resourceCountIs('AWS::Events::Rule', 1);
-    template.resourceCountIs('AWS::Lambda::Function', 5);
+    template.resourceCountIs('AWS::Lambda::Function', 6);
     template.resourceCountIs('AWS::ApiGatewayV2::Api', 1);
-    template.resourceCountIs('AWS::ApiGatewayV2::Route', 8);
-    template.resourceCountIs('AWS::CloudWatch::Alarm', 6);
+    template.resourceCountIs('AWS::ApiGatewayV2::Route', 9);
+    template.resourceCountIs('AWS::CloudWatch::Alarm', 7);
 
     template.hasResourceProperties('AWS::Lambda::Function', {
       Runtime: 'nodejs22.x'
@@ -45,6 +45,7 @@ describe('Phase 2 stack', () => {
     expect(stateMachineBody).toContain('StartRun');
     expect(stateMachineBody).toContain('FetchRaw');
     expect(stateMachineBody).toContain('Normalize');
+    expect(stateMachineBody).toContain('ComputeSignals');
 
     template.hasResourceProperties('AWS::Events::Rule', {
       ScheduleExpression: 'cron(0 6 * * ? *)'
@@ -67,6 +68,10 @@ describe('Phase 2 stack', () => {
 
     template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
       RouteKey: 'GET /cards/{cardId}/price/latest'
+    });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'GET /cards/{cardId}/signals/latest'
     });
 
     template.hasResourceProperties('AWS::ApiGatewayV2::Route', {

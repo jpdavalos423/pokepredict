@@ -54,7 +54,8 @@ function createRepoMock(): ApiReadRepository {
     listCardsByNamePrefix: vi.fn(async (): Promise<PaginatedItems<CardListItem>> => ({ items: [] })),
     getCardById: vi.fn(async (): Promise<CardDetail | null> => null),
     getLatestPrice: vi.fn(async (): Promise<LatestPriceResponse | null> => null),
-    getPriceHistory: vi.fn(async (): Promise<PriceHistoryPoint[]> => [])
+    getPriceHistory: vi.fn(async (): Promise<PriceHistoryPoint[]> => []),
+    getLatestSignal: vi.fn(async () => null)
   };
 }
 
@@ -390,6 +391,34 @@ describe('Phase 2 API routes', () => {
     expect(result.statusCode).toBe(404);
     const body = parseBody<{ error?: { code?: string } }>(result);
     expect(body.error?.code).toBe('PRICE_NOT_FOUND');
+  });
+
+  it('GET /cards/{cardId}/signals/latest returns latest signal when found', async () => {
+    const repo = createRepoMock();
+    vi.mocked(repo.getLatestSignal).mockResolvedValue({
+      cardId: 'sv3-198',
+      asOfDate: '2026-03-04',
+      ret7dBps: 120,
+      ret30dBps: 410,
+      vol30dBps: 235,
+      trend: 'UPTREND'
+    });
+
+    const result = await createTestHandler(repo)(
+      createEvent('/cards/sv3-198/signals/latest')
+    );
+
+    expect(result.statusCode).toBe(200);
+  });
+
+  it('GET /cards/{cardId}/signals/latest returns 404 when missing', async () => {
+    const result = await createTestHandler(createRepoMock())(
+      createEvent('/cards/sv3-198/signals/latest')
+    );
+
+    expect(result.statusCode).toBe(404);
+    const body = parseBody<{ error?: { code?: string } }>(result);
+    expect(body.error?.code).toBe('SIGNALS_NOT_FOUND');
   });
 
   it('GET /cards/{cardId}/prices returns ordered points for valid range', async () => {

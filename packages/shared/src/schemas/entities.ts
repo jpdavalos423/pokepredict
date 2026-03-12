@@ -53,6 +53,17 @@ export const alertSchema = z.object({
   lastTriggeredAt: z.string().datetime().optional()
 });
 
+export const signalSchema = z.object({
+  cardId: z.string().min(1),
+  asOfDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  ret7dBps: z.int(),
+  ret30dBps: z.int(),
+  vol30dBps: z.int().nonnegative(),
+  trend: z.enum(['UPTREND', 'DOWNTREND', 'SIDEWAYS']),
+  pred7dLowBps: z.int().optional(),
+  pred7dHighBps: z.int().optional()
+});
+
 export const startRunInputSchema = z.object({
   source: z.string().min(1),
   mode: z.enum(['scheduled', 'manual']),
@@ -97,6 +108,16 @@ export const fetchRawResultSchema = z.object({
 });
 
 export const normalizeResultSchema = z.object({
+  runId: z.string().min(1),
+  asOf: z.string().datetime(),
+  source: z.string().min(1),
+  mode: z.enum(['scheduled', 'manual']),
+  startedAt: z.string().datetime(),
+  processedCount: z.number().int().nonnegative(),
+  updatedCardIds: z.array(z.string().min(1))
+});
+
+export const computeSignalsResultSchema = z.object({
   runId: z.string().min(1),
   asOf: z.string().datetime(),
   source: z.string().min(1),

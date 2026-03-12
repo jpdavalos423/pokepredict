@@ -7,6 +7,7 @@ export interface PipelineConfig {
     cards: string;
     prices: string;
     latestPrices: string;
+    signals: string;
   };
 }
 
@@ -31,7 +32,8 @@ export function loadPipelineConfig(): PipelineConfig {
     tables: {
       cards: required('TABLE_CARDS'),
       prices: required('TABLE_PRICES'),
-      latestPrices: required('TABLE_LATEST_PRICES')
+      latestPrices: required('TABLE_LATEST_PRICES'),
+      signals: required('TABLE_SIGNALS')
     }
   };
 }

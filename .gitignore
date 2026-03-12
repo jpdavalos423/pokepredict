@@ -9,3 +9,4 @@ cdk.out/
 .env
 .phase1.env
 *.tsbuildinfo
+.DS_Store

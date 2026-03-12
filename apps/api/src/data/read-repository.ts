@@ -3,7 +3,8 @@ import type {
   CardDetail,
   CardListItem,
   LatestPriceResponse,
-  PriceHistoryPoint
+  PriceHistoryPoint,
+  Signal
 } from '@pokepredict/shared';
 import type { ApiConfig } from '../config';
 
@@ -31,6 +32,7 @@ export interface ApiReadRepository {
   getCardById(cardId: string): Promise<CardDetail | null>;
   getLatestPrice(cardId: string): Promise<LatestPriceResponse | null>;
   getPriceHistory(cardId: string, fromIso: string, toIso: string): Promise<PriceHistoryPoint[]>;
+  getLatestSignal(cardId: string): Promise<Signal | null>;
 }
 
 function asString(value: unknown, field: string): string {
@@ -139,6 +141,29 @@ function toHistoryPoint(item: Record<string, unknown>): PriceHistoryPoint {
   }
 
   return point;
+}
+
+function toSignal(item: Record<string, unknown>): Signal {
+  const signal: Signal = {
+    cardId: asString(item.cardId, 'cardId'),
+    asOfDate: asString(item.asOfDate, 'asOfDate'),
+    ret7dBps: asNumber(item.ret7dBps, 'ret7dBps'),
+    ret30dBps: asNumber(item.ret30dBps, 'ret30dBps'),
+    vol30dBps: asNumber(item.vol30dBps, 'vol30dBps'),
+    trend: asString(item.trend, 'trend') as Signal['trend']
+  };
+
+  const pred7dLowBps = asOptionalNumber(item.pred7dLowBps);
+  if (pred7dLowBps !== undefined) {
+    signal.pred7dLowBps = pred7dLowBps;
+  }
+
+  const pred7dHighBps = asOptionalNumber(item.pred7dHighBps);
+  if (pred7dHighBps !== undefined) {
+    signal.pred7dHighBps = pred7dHighBps;
+  }
+
+  return signal;
 }
 
 export class DynamoApiReadRepository implements ApiReadRepository {
@@ -262,5 +287,26 @@ export class DynamoApiReadRepository implements ApiReadRepository {
     );
 
     return (response.Items ?? []).map((item) => toHistoryPoint(item as Record<string, unknown>));
+  }
+
+  async getLatestSignal(cardId: string): Promise<Signal | null> {
+    const response = await this.ddb.send(
+      new QueryCommand({
+        TableName: this.cfg.tables.signals,
+        KeyConditionExpression: 'pk = :pk',
+        ExpressionAttributeValues: {
+          ':pk': `CARD#${cardId}`
+        },
+        Limit: 1,
+        ScanIndexForward: false
+      })
+    );
+
+    const item = response.Items?.[0] as Record<string, unknown> | undefined;
+    if (!item) {
+      return null;
+    }
+
+    return toSignal(item);
   }
 }
