@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
+import { AppShell } from './components/shell';
 import './globals.css';
 
 export const metadata = {
   title: 'PokePredict',
-  description: 'Pokemon TCG market intelligence scaffold'
+  description: 'Pokemon TCG market intelligence'
 };
 
 interface RootLayoutProps {
@@ -13,7 +14,9 @@ interface RootLayoutProps {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AppShell>{children}</AppShell>
+      </body>
     </html>
   );
 }
