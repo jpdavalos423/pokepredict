@@ -4,7 +4,7 @@ Date: March 4, 2026
 
 ## Goal
 Deliver the data platform foundation:
-- ingest fixture source payloads on schedule/manual run
+- ingest configured source payloads on schedule/manual run (`tcgdex` by default in Phase 2.5+)
 - archive raw payloads in S3
 - normalize and persist price data into `Prices` and `LatestPrices`
 
@@ -16,7 +16,7 @@ Deliver the data platform foundation:
 `StartRun` is the canonical run-context initializer.
 EventBridge does not generate run IDs. Scheduled events send only:
 ```json
-{ "source": "fixture", "mode": "scheduled" }
+{ "source": "tcgdex", "mode": "scheduled" }
 ```
 
 ## What Was Added
@@ -42,15 +42,26 @@ EventBridge does not generate run IDs. Scheduled events send only:
 pnpm build
 pnpm test
 pnpm generate:data
+pnpm generate:data:tcgdex
 pnpm --filter @pokepredict/cdk dev
 pnpm deploy:phase1
+```
+
+## Phase 2.5 Deployment Note
+- `pnpm deploy:phase1` is still the deploy helper script name, but it is not fixture-only.
+- Default behavior now validates the TCGdex path:
+  - pipeline source defaults to `tcgdex`
+  - seeding uses `generate:data:tcgdex` unless overridden
+- Set both vars only if fixture validation is intentional:
+```bash
+SOURCE_NAME=fixture SEED_SOURCE=fixture pnpm deploy:phase1
 ```
 
 ## Manual State Machine Trigger (example)
 Use AWS CLI `stepfunctions start-execution` with input:
 ```json
 {
-  "source": "fixture",
+  "source": "tcgdex",
   "mode": "manual",
   "runId": "run_manual_001",
   "asOf": "2026-03-04T18:00:00.000Z"

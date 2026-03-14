@@ -29,11 +29,23 @@ pnpm generate:data
 ```
 Requires `TABLE_CARDS` and `AWS_REGION` env vars (see `.env.example`).
 
+To seed cards from TCGdex (recommended for Phase 2.5+):
+```bash
+pnpm generate:data:tcgdex
+```
+Requires `TABLE_CARDS` and `AWS_REGION`; optional TCGdex knobs are in `.env.example`.
+
 ## Phase 1 Fast Deploy
 ```bash
 pnpm deploy:phase1
 ```
 This builds pipeline artifacts, vendors runtime deps, deploys CDK, seeds cards, and triggers one manual ingestion run.
+`deploy:phase1` is a legacy command name. For Phase 2.5+, it defaults to `SOURCE_NAME=tcgdex` and seeds cards with `generate:data:tcgdex`.
+
+Use overrides only when intentionally validating fixture mode:
+```bash
+SOURCE_NAME=fixture SEED_SOURCE=fixture pnpm deploy:phase1
+```
 
 ## Dev Commands
 ```bash
