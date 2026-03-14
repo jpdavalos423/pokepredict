@@ -77,6 +77,7 @@ describe('portfolio utilities', () => {
       cardId: 'sv3-169',
       asOf: '2026-03-04T00:00:00.000Z',
       marketCents: 1500,
+      marketPrice: 15,
       currency: 'USD',
       source: 'fixture'
     };

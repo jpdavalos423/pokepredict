@@ -56,6 +56,10 @@ function asOptionalNumber(value: unknown): number | undefined {
   return value;
 }
 
+function centsToUsdDecimal(cents: number): number {
+  return cents / 100;
+}
+
 function toCardListItem(item: Record<string, unknown>): CardListItem {
   const card: CardListItem = {
     cardId: asString(item.cardId, 'cardId'),
@@ -101,10 +105,12 @@ function toCardDetail(item: Record<string, unknown>): CardDetail {
 }
 
 function toLatestPrice(item: Record<string, unknown>): LatestPriceResponse {
+  const marketCents = asNumber(item.marketCents, 'marketCents');
   const latest: LatestPriceResponse = {
     cardId: asString(item.cardId, 'cardId'),
     asOf: asString(item.asOf, 'asOf'),
-    marketCents: asNumber(item.marketCents, 'marketCents'),
+    marketCents,
+    marketPrice: centsToUsdDecimal(marketCents),
     currency: 'USD',
     source: asString(item.source, 'source')
   };
@@ -123,9 +129,11 @@ function toLatestPrice(item: Record<string, unknown>): LatestPriceResponse {
 }
 
 function toHistoryPoint(item: Record<string, unknown>): PriceHistoryPoint {
+  const marketCents = asNumber(item.marketCents, 'marketCents');
   const point: PriceHistoryPoint = {
     ts: asString(item.ts, 'ts'),
-    marketCents: asNumber(item.marketCents, 'marketCents'),
+    marketCents,
+    marketPrice: centsToUsdDecimal(marketCents),
     currency: 'USD',
     source: asString(item.source, 'source')
   };

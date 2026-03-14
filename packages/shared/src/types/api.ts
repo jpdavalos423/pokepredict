@@ -69,6 +69,7 @@ export interface LatestPriceResponse {
   cardId: string;
   asOf: string;
   marketCents: number;
+  marketPrice: number;
   lowCents?: number | undefined;
   highCents?: number | undefined;
   currency: 'USD';
@@ -78,6 +79,7 @@ export interface LatestPriceResponse {
 export interface PriceHistoryPoint {
   ts: string;
   marketCents: number;
+  marketPrice: number;
   lowCents?: number | undefined;
   highCents?: number | undefined;
   currency: 'USD';

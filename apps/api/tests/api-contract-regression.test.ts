@@ -96,12 +96,13 @@ function createTestHandler(repo: ApiReadRepository) {
 }
 
 describe('API contract regression', () => {
-  it('keeps /cards/{cardId}/price/latest response shape unchanged', async () => {
+  it('keeps /cards/{cardId}/price/latest response shape with marketPrice alias', async () => {
     const repo = createReadRepoMock();
     vi.mocked(repo.getLatestPrice).mockResolvedValue({
       cardId: 'sv3-198',
       asOf: '2026-03-11T06:00:00.000Z',
       marketCents: 11000,
+      marketPrice: 110,
       lowCents: 10500,
       highCents: 11500,
       currency: 'USD',
@@ -118,6 +119,7 @@ describe('API contract regression', () => {
         cardId: 'sv3-198',
         asOf: '2026-03-11T06:00:00.000Z',
         marketCents: 11000,
+        marketPrice: 110,
         lowCents: 10500,
         highCents: 11500,
         currency: 'USD',
@@ -127,18 +129,20 @@ describe('API contract regression', () => {
     });
   });
 
-  it('keeps /cards/{cardId}/prices response shape unchanged with stored snapshots', async () => {
+  it('keeps /cards/{cardId}/prices response shape with marketPrice on each point', async () => {
     const repo = createReadRepoMock();
     vi.mocked(repo.getPriceHistory).mockResolvedValue([
       {
         ts: '2026-03-10T06:00:00.000Z',
         marketCents: 10000,
+        marketPrice: 100,
         currency: 'USD',
         source: 'tcgdex'
       },
       {
         ts: '2026-03-11T06:00:00.000Z',
         marketCents: 11000,
+        marketPrice: 110,
         currency: 'USD',
         source: 'tcgdex'
       }
@@ -159,12 +163,14 @@ describe('API contract regression', () => {
           {
             ts: '2026-03-10T06:00:00.000Z',
             marketCents: 10000,
+            marketPrice: 100,
             currency: 'USD',
             source: 'tcgdex'
           },
           {
             ts: '2026-03-11T06:00:00.000Z',
             marketCents: 11000,
+            marketPrice: 110,
             currency: 'USD',
             source: 'tcgdex'
           }

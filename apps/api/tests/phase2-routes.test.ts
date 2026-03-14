@@ -386,6 +386,7 @@ describe('Phase 2 API routes', () => {
       cardId: 'sv3-198',
       asOf: '2026-03-04T18:00:00.000Z',
       marketCents: 12000,
+      marketPrice: 120,
       currency: 'USD',
       source: 'fixture'
     });
@@ -395,6 +396,8 @@ describe('Phase 2 API routes', () => {
     );
 
     expect(result.statusCode).toBe(200);
+    const body = parseBody<{ data: LatestPriceResponse }>(result);
+    expect(body.data.marketPrice).toBe(body.data.marketCents / 100);
   });
 
   it('GET /cards/{cardId}/price/latest returns 404 when missing', async () => {
@@ -441,12 +444,14 @@ describe('Phase 2 API routes', () => {
       {
         ts: '2026-03-03T18:00:00.000Z',
         marketCents: 11000,
+        marketPrice: 110,
         currency: 'USD',
         source: 'fixture'
       },
       {
         ts: '2026-03-04T18:00:00.000Z',
         marketCents: 12000,
+        marketPrice: 120,
         currency: 'USD',
         source: 'fixture'
       }
@@ -461,6 +466,8 @@ describe('Phase 2 API routes', () => {
     expect(body.data.points).toHaveLength(2);
     expect(body.data.points[0]?.ts).toBe('2026-03-03T18:00:00.000Z');
     expect(body.data.points[1]?.ts).toBe('2026-03-04T18:00:00.000Z');
+    expect(body.data.points[0]?.marketPrice).toBe(body.data.points[0]?.marketCents / 100);
+    expect(body.data.points[1]?.marketPrice).toBe(body.data.points[1]?.marketCents / 100);
   });
 
   it('GET /cards/{cardId}/prices rejects invalid range', async () => {

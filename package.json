@@ -13,6 +13,7 @@
     "test:e2e": "playwright test",
     "generate:data": "tsx scripts/bootstrap-cards.ts",
     "generate:data:tcgdex": "tsx scripts/bootstrap-cards-tcgdex.ts",
+    "verify:price:endpoints": "tsx scripts/verify-price-endpoints.ts",
     "deploy:phase1": "bash scripts/deploy-phase1.sh --run",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
