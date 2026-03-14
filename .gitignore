@@ -7,6 +7,10 @@ test-results/
 cdk.out/
 .pnpm-store/
 .env
+.env.local
+.env.*.local
+**/.env.local
+**/.env.*.local
 .phase1.env
 *.tsbuildinfo
 .DS_Store
