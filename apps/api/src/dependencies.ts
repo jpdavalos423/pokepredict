@@ -7,11 +7,13 @@ import {
   type PortfolioRepository,
   DynamoPortfolioRepository
 } from './data/portfolio-repository';
+import { type AlertsRepository, DynamoAlertsRepository } from './data/alerts-repository';
 import { type ApiReadRepository, DynamoApiReadRepository } from './data/read-repository';
 
 export interface ApiDependencies {
   repo: ApiReadRepository;
   portfolioRepo: PortfolioRepository;
+  alertsRepo: AlertsRepository;
   cursorSigningSecret: string;
   now: () => Date;
 }
@@ -54,6 +56,7 @@ export async function createApiDependencies(
   return {
     repo: new DynamoApiReadRepository(ddb, config),
     portfolioRepo: new DynamoPortfolioRepository(ddb, config),
+    alertsRepo: new DynamoAlertsRepository(ddb, config),
     cursorSigningSecret,
     now: () => new Date()
   };

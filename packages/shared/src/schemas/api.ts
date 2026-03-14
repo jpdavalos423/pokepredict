@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  ALERT_TYPES,
   DEFAULT_PAGE_LIMIT,
   HOLDING_CONDITIONS,
   HOLDING_VARIANTS,
@@ -103,6 +104,29 @@ export const portfolioHoldingValuationSchema = holdingResponseSchema.extend({
 export const portfolioResponseSchema = z.object({
   summary: portfolioSummarySchema,
   holdings: z.array(portfolioHoldingValuationSchema)
+});
+
+export const createAlertRequestSchema = z.object({
+  cardId: z.string().min(1),
+  type: z.enum(ALERT_TYPES),
+  thresholdCents: z.int().positive(),
+  cooldownHours: z.int().positive(),
+  notifyEmail: z.string().email()
+});
+
+export const alertResponseSchema = createAlertRequestSchema.extend({
+  alertId: z.string().min(1),
+  userId: z.string().min(1),
+  enabled: z.boolean(),
+  lastTriggeredAt: z.string().datetime().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  version: z.int().nonnegative(),
+  requestHash: z.string().min(1).optional()
+});
+
+export const alertsListResponseSchema = z.object({
+  alerts: z.array(alertResponseSchema)
 });
 
 export const cursorPayloadParamsSchema = z

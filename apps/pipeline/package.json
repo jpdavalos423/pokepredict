@@ -15,6 +15,7 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.916.0",
     "@aws-sdk/client-s3": "^3.916.0",
+    "@aws-sdk/client-sesv2": "^3.916.0",
     "@aws-sdk/lib-dynamodb": "^3.916.0",
     "@pokepredict/shared": "workspace:*",
     "ulid": "^3.0.1"

@@ -134,4 +134,10 @@ export interface ComputeSignalsResult extends StartRunResult {
   updatedCardIds: string[];
 }
 
+export interface AlertsEvalResult extends StartRunResult {
+  processedCardCount: number;
+  triggeredAlertCount: number;
+  sentNotificationCount: number;
+}
+
 export type PipelineEventContext = StartRunResult;

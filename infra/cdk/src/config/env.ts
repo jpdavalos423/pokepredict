@@ -6,6 +6,7 @@ export interface CdkEnvConfig {
   sourceName: string;
   ingestScheduleCron: string;
   cursorSigningSecretParam: string;
+  sesFromEmail: string;
 }
 
 function readOrDefault(name: string, fallback: string): string {
@@ -24,6 +25,7 @@ export function loadCdkEnvConfig(): CdkEnvConfig {
     cursorSigningSecretParam: readOrDefault(
       'CURSOR_SIGNING_SECRET_PARAM',
       `/pokepredict/${stage}/cursor-signing-secret`
-    )
+    ),
+    sesFromEmail: readOrDefault('SES_FROM_EMAIL', `alerts+${stage}@pokepredict.dev`)
   };
 }

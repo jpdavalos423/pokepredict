@@ -1,7 +1,7 @@
 # Pokepredict API Contract
 
 Version: v1  
-Last Updated: March 6, 2026
+Last Updated: March 12, 2026
 
 Base: API Gateway HTTP API
 
@@ -168,7 +168,8 @@ Behavior:
 ### GET /alerts
 Auth: `x-user-id`
 
-Returns all user alerts. Pagination is optional in MVP; if enabled, follows global cursor contract.
+Returns all user alerts.
+- No pagination in Phase 5.
 
 ### POST /alerts
 Auth: `x-user-id`
@@ -187,13 +188,16 @@ Request sample:
 Behavior:
 - Returns `201` with generated opaque `alertId`
 - Valid types: `PRICE_ABOVE`, `PRICE_BELOW`
+- Same `x-user-id` + same `Idempotency-Key` + same payload returns same alert with `201`
+- Same `x-user-id` + same `Idempotency-Key` + different payload returns `409 IDEMPOTENCY_CONFLICT`
+- Without `Idempotency-Key`, identical payloads are allowed as separate alerts
 
 ### DELETE /alerts/{alertId}
 Auth: `x-user-id`
 
 Behavior:
 - `204` on success
-- `404` when alert does not exist for user
+- `404 ALERT_NOT_FOUND` when alert does not exist for user
 
 ## Alert Trigger Semantics (Pipeline)
 Crossing-only model:
@@ -217,8 +221,10 @@ Cooldown:
 - `SIGNALS_NOT_FOUND`
 - `HOLDING_NOT_FOUND`
 - `IDEMPOTENCY_CONFLICT`
+- `ALERT_NOT_FOUND`
 
 ## Changelog
+- v1 (March 12, 2026): Phase 5 updates: alerts CRUD endpoints (`GET/POST/DELETE /alerts*`), idempotent create semantics, and pipeline `AlertsEval` + SES delivery behavior.
 - v1 (March 6, 2026): Phase 4 updates: implemented `GET /cards/{cardId}/signals/latest` backed by persisted `Signals` records from pipeline `ComputeSignals`.
 - v1 (March 5, 2026): Phase 3 portfolio contract finalized: `GET /portfolio`, `POST /portfolio/holdings`, `DELETE /portfolio/holdings/{holdingId}`, idempotency conflict semantics, and zero-market-value behavior for missing latest prices.
 - v1 (March 4, 2026): Phase 2 updates: public cards/prices read endpoints implemented, limit capped at 50, signed context-aware cursor contract (`route/index/params/limit` validation).

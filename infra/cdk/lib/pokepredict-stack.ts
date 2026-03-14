@@ -28,6 +28,7 @@ export interface PokepredictStackProps extends StackProps {
   ingestScheduleCron: string;
   cursorSigningSecretParam: string;
   cursorSigningSecretVersion: number;
+  sesFromEmail: string;
 }
 
 export class PokepredictStack extends Stack {
@@ -135,7 +136,10 @@ export class PokepredictStack extends Stack {
         TABLE_CARDS: cardsTable.tableName,
         TABLE_PRICES: pricesTable.tableName,
         TABLE_LATEST_PRICES: latestPricesTable.tableName,
-        TABLE_SIGNALS: signalsTable.tableName
+        TABLE_SIGNALS: signalsTable.tableName,
+        TABLE_ALERTS_BY_USER: alertsByUserTable.tableName,
+        TABLE_ALERTS_BY_CARD: alertsByCardTable.tableName,
+        SES_FROM_EMAIL: props.sesFromEmail
       }
     });
 
@@ -151,7 +155,10 @@ export class PokepredictStack extends Stack {
         TABLE_CARDS: cardsTable.tableName,
         TABLE_PRICES: pricesTable.tableName,
         TABLE_LATEST_PRICES: latestPricesTable.tableName,
-        TABLE_SIGNALS: signalsTable.tableName
+        TABLE_SIGNALS: signalsTable.tableName,
+        TABLE_ALERTS_BY_USER: alertsByUserTable.tableName,
+        TABLE_ALERTS_BY_CARD: alertsByCardTable.tableName,
+        SES_FROM_EMAIL: props.sesFromEmail
       }
     });
 
@@ -167,7 +174,29 @@ export class PokepredictStack extends Stack {
         TABLE_CARDS: cardsTable.tableName,
         TABLE_PRICES: pricesTable.tableName,
         TABLE_LATEST_PRICES: latestPricesTable.tableName,
-        TABLE_SIGNALS: signalsTable.tableName
+        TABLE_SIGNALS: signalsTable.tableName,
+        TABLE_ALERTS_BY_USER: alertsByUserTable.tableName,
+        TABLE_ALERTS_BY_CARD: alertsByCardTable.tableName,
+        SES_FROM_EMAIL: props.sesFromEmail
+      }
+    });
+
+    const alertsEvalFunction = new lambdaNodejs.NodejsFunction(this, 'AlertsEvalFunction', {
+      runtime: lambda.Runtime.NODEJS_22_X,
+      entry: path.join(pipelineSrcPath, 'alertsEval.ts'),
+      handler: 'handler',
+      timeout: Duration.seconds(120),
+      bundling,
+      environment: {
+        RAW_BUCKET: rawBucket.bucketName,
+        SOURCE_NAME: props.sourceName,
+        TABLE_CARDS: cardsTable.tableName,
+        TABLE_PRICES: pricesTable.tableName,
+        TABLE_LATEST_PRICES: latestPricesTable.tableName,
+        TABLE_SIGNALS: signalsTable.tableName,
+        TABLE_ALERTS_BY_USER: alertsByUserTable.tableName,
+        TABLE_ALERTS_BY_CARD: alertsByCardTable.tableName,
+        SES_FROM_EMAIL: props.sesFromEmail
       }
     });
 
@@ -198,12 +227,24 @@ export class PokepredictStack extends Stack {
     latestPricesTable.grantReadWriteData(normalizeFunction);
     pricesTable.grantReadData(computeSignalsFunction);
     signalsTable.grantWriteData(computeSignalsFunction);
+    alertsByCardTable.grantReadWriteData(alertsEvalFunction);
+    alertsByUserTable.grantReadWriteData(alertsEvalFunction);
+    latestPricesTable.grantReadData(alertsEvalFunction);
+    pricesTable.grantReadData(alertsEvalFunction);
+    alertsEvalFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ses:SendEmail'],
+        resources: ['*']
+      })
+    );
 
     cardsTable.grantReadData(apiFunction);
     pricesTable.grantReadData(apiFunction);
     latestPricesTable.grantReadData(apiFunction);
     holdingsTable.grantReadWriteData(apiFunction);
     signalsTable.grantReadData(apiFunction);
+    alertsByUserTable.grantReadWriteData(apiFunction);
+    alertsByCardTable.grantReadWriteData(apiFunction);
 
     const region = Stack.of(this).region;
     const account = Stack.of(this).account;
@@ -234,7 +275,16 @@ export class PokepredictStack extends Stack {
       payloadResponseOnly: true
     });
 
-    const definition = startRunTask.next(fetchRawTask).next(normalizeTask).next(computeSignalsTask);
+    const alertsEvalTask = new sfnTasks.LambdaInvoke(this, 'AlertsEval', {
+      lambdaFunction: alertsEvalFunction,
+      payloadResponseOnly: true
+    });
+
+    const definition = startRunTask
+      .next(fetchRawTask)
+      .next(normalizeTask)
+      .next(computeSignalsTask)
+      .next(alertsEvalTask);
 
     const stateMachine = new sfn.StateMachine(this, 'IngestionStateMachine', {
       stateMachineName: `${prefix}-ingestion`,
@@ -326,6 +376,18 @@ export class PokepredictStack extends Stack {
       integration: apiIntegration
     });
 
+    httpApi.addRoutes({
+      path: '/alerts',
+      methods: [apigatewayv2.HttpMethod.GET, apigatewayv2.HttpMethod.POST],
+      integration: apiIntegration
+    });
+
+    httpApi.addRoutes({
+      path: '/alerts/{alertId}',
+      methods: [apigatewayv2.HttpMethod.DELETE],
+      integration: apiIntegration
+    });
+
     new cloudwatch.Alarm(this, 'StateMachineFailuresAlarm', {
       metric: stateMachine.metricFailed({
         period: Duration.minutes(5),
@@ -340,6 +402,7 @@ export class PokepredictStack extends Stack {
     this.createLambdaErrorAlarm('FetchRawErrorsAlarm', fetchRawFunction);
     this.createLambdaErrorAlarm('NormalizeErrorsAlarm', normalizeFunction);
     this.createLambdaErrorAlarm('ComputeSignalsErrorsAlarm', computeSignalsFunction);
+    this.createLambdaErrorAlarm('AlertsEvalErrorsAlarm', alertsEvalFunction);
     this.createLambdaErrorAlarm('ApiLambdaErrorsAlarm', apiFunction);
 
     new cloudwatch.Alarm(this, 'Api5xxAlarm', {

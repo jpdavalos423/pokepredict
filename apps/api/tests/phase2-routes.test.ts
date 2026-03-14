@@ -2,6 +2,7 @@ import { encodeCursor, type CardDetail, type CardListItem, type LatestPriceRespo
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { describe, expect, it, vi } from 'vitest';
 import type { PortfolioRepository } from '../src/data/portfolio-repository';
+import type { AlertsRepository } from '../src/data/alerts-repository';
 import { type ApiDependencies } from '../src/dependencies';
 import type { ApiReadRepository, PaginatedItems } from '../src/data/read-repository';
 import { createHandler } from '../src/handler';
@@ -71,12 +72,24 @@ function createPortfolioRepoMock(): PortfolioRepository {
   };
 }
 
+function createAlertsRepoMock(): AlertsRepository {
+  return {
+    createAlert: vi.fn(async () => {}),
+    createAlertWithIdempotency: vi.fn(async () => {}),
+    getAlert: vi.fn(async () => null),
+    deleteAlert: vi.fn(async () => {}),
+    getIdempotencyAlias: vi.fn(async () => null),
+    listAlertsByUser: vi.fn(async () => [])
+  };
+}
+
 function createTestHandler(repo: ApiReadRepository) {
   return createHandler(
     () =>
       ({
         repo,
         portfolioRepo: createPortfolioRepoMock(),
+        alertsRepo: createAlertsRepoMock(),
         cursorSigningSecret: CURSOR_SECRET,
         now: () => new Date('2026-03-04T18:00:00.000Z')
       }) satisfies ApiDependencies
@@ -165,6 +178,7 @@ describe('Phase 2 API routes', () => {
       return {
         repo,
         portfolioRepo: createPortfolioRepoMock(),
+        alertsRepo: createAlertsRepoMock(),
         cursorSigningSecret: CURSOR_SECRET,
         now: () => new Date('2026-03-04T18:00:00.000Z')
       };

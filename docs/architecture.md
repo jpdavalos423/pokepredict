@@ -9,7 +9,7 @@
 - Alerts delivery: SES (Phase 5)
 - IaC: AWS CDK in `infra/cdk`
 
-## Implemented Pipeline Data Flow (Phase 1 + Phase 4)
+## Implemented Pipeline Data Flow (Phase 1 + Phase 4 + Phase 5)
 1. EventBridge schedule triggers Step Functions with fixed input:
    - `source=fixture`
    - `mode=scheduled`
@@ -23,12 +23,17 @@
    - `LatestPrices` snapshots guarded by newer `asOf`
 5. `ComputeSignals` reads recent `Prices` for updated cards and upserts daily `Signals`:
    - `ret7dBps`, `ret30dBps`, `vol30dBps`, `trend`
+6. `AlertsEval` evaluates enabled alerts for updated cards:
+   - crossing-only threshold checks against latest + previous price
+   - cooldown suppression
+   - SES notification delivery
+   - transactional `lastTriggeredAt` updates across alert tables
 
 ## Planned Later Steps
-- `AlertsEval` + SES notifications (Phase 5)
+- Optional predictive extension (Phase 6)
 
 ## Operational Baseline
 - Structured JSON logs include run context (`runId`, `source`, `mode`).
 - CloudWatch alarms on:
   - Step Functions failures
-  - Lambda errors (`StartRun`, `FetchRaw`, `Normalize`)
+  - Lambda errors (`StartRun`, `FetchRaw`, `Normalize`, `ComputeSignals`, `AlertsEval`)

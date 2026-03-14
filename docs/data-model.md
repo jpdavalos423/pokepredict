@@ -1,7 +1,7 @@
 # Pokepredict Data Model
 
 Version: v1  
-Last Updated: March 6, 2026
+Last Updated: March 12, 2026
 
 ## Key Conventions
 - Card partition key prefix: `CARD#<cardId>`
@@ -104,6 +104,16 @@ Access patterns:
 - List alerts by user: `Query` on user partition
 - Delete user alert: `DeleteItem`
 
+Idempotency alias records (same `AlertsByUser` table):
+- `pk = USER#<userId>`
+- `sk = IDEMP#<idempotencyKey>`
+- Attributes: `alertId`, `requestHash`, `createdAt`, `updatedAt`, `version`, `entityType=IDEMP`
+
+Create semantics with idempotency:
+- `POST /alerts` with `Idempotency-Key` uses `TransactWriteItems` to write user alert, card alert, and idempotency alias
+- Replayed same-key same-payload resolves via alias lookup and returns original alert
+- Replayed same-key different-payload returns `409 IDEMPOTENCY_CONFLICT`
+
 ### AlertsByCard
 Primary key:
 - `pk = CARD#<cardId>`
@@ -117,6 +127,7 @@ Access patterns:
 
 Write policy:
 - `TransactWriteItems` keeps `AlertsByUser` and `AlertsByCard` in sync.
+- `lastTriggeredAt` updates are applied to both tables transactionally after successful notification delivery.
 
 ### Signals
 Primary key:
@@ -149,7 +160,7 @@ Write rule:
 - `GET /alerts`: `AlertsByUser.Query`
 - `POST /alerts`: transactional dual write (`AlertsByUser` + `AlertsByCard`)
 - `DELETE /alerts/{alertId}`: transactional dual delete
-- Alerts pipeline evaluation: `AlertsByCard.Query`
+- Alerts pipeline evaluation: `AlertsByCard.Query` + latest/previous price reads + SES delivery + transactional `lastTriggeredAt` update
 
 ## Idempotency and Replay
 - Pipeline execution includes `runId` and writes `runId` to derived records.
@@ -161,6 +172,7 @@ Write rule:
 - Latest price read may use strong consistency when user-facing freshness is critical.
 
 ## Changelog
+- v1 (March 12, 2026): Phase 5 updates: alerts idempotency alias pattern (`IDEMP#`) and alert evaluation delivery flow (`AlertsEval` + SES + transactional trigger timestamp updates).
 - v1 (March 6, 2026): Phase 4 updates: concrete Signals write semantics from pipeline `ComputeSignals`, plus `runId`/`source` traceability attributes.
 - v1 (March 5, 2026): Phase 3 updates: holdings idempotency alias record pattern (`IDEMP#`) and transactional create semantics for portfolio holdings.
 - v1 (March 4, 2026): Phase 2 clarifications for no-scan card read paths (`GSI2` prefix search and `GSI1` set+query narrowing filter).

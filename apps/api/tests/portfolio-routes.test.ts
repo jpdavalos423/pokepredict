@@ -6,6 +6,7 @@ import type {
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { describe, expect, it, vi } from 'vitest';
 import type { PortfolioRepository } from '../src/data/portfolio-repository';
+import type { AlertsRepository } from '../src/data/alerts-repository';
 import type { ApiReadRepository, PaginatedItems } from '../src/data/read-repository';
 import { createHandler } from '../src/handler';
 import { computeHoldingRequestHash } from '../src/routes/portfolio/utils';
@@ -80,6 +81,17 @@ function createPortfolioRepoMock(): PortfolioRepository {
   };
 }
 
+function createAlertsRepoMock(): AlertsRepository {
+  return {
+    createAlert: vi.fn(async () => {}),
+    createAlertWithIdempotency: vi.fn(async () => {}),
+    getAlert: vi.fn(async () => null),
+    deleteAlert: vi.fn(async () => {}),
+    getIdempotencyAlias: vi.fn(async () => null),
+    listAlertsByUser: vi.fn(async () => [])
+  };
+}
+
 function createTestHandler(
   readRepo: ApiReadRepository,
   portfolioRepo: PortfolioRepository
@@ -89,6 +101,7 @@ function createTestHandler(
       ({
         repo: readRepo,
         portfolioRepo,
+        alertsRepo: createAlertsRepoMock(),
         cursorSigningSecret: 'test-cursor-secret',
         now: () => new Date('2026-03-05T10:00:00.000Z')
       }) satisfies ApiDependencies

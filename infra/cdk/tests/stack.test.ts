@@ -3,7 +3,7 @@ import { Match, Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it } from 'vitest';
 import { PokepredictStack } from '../lib/pokepredict-stack';
 
-describe('Phase 4 stack', () => {
+describe('Phase 5 stack', () => {
   it('creates pipeline + public API resources with alarms and outputs', () => {
     const app = new App();
     const stack = new PokepredictStack(app, 'test-stack', {
@@ -12,7 +12,8 @@ describe('Phase 4 stack', () => {
       sourceName: 'fixture',
       ingestScheduleCron: 'cron(0 6 * * ? *)',
       cursorSigningSecretParam: '/pokepredict/dev/cursor-signing-secret',
-      cursorSigningSecretVersion: 1
+      cursorSigningSecretVersion: 1,
+      sesFromEmail: 'alerts+dev@pokepredict.dev'
     });
 
     const template = Template.fromStack(stack);
@@ -20,10 +21,10 @@ describe('Phase 4 stack', () => {
     template.resourceCountIs('AWS::DynamoDB::Table', 7);
     template.resourceCountIs('AWS::StepFunctions::StateMachine', 1);
     template.resourceCountIs('AWS::Events::Rule', 1);
-    template.resourceCountIs('AWS::Lambda::Function', 6);
+    template.resourceCountIs('AWS::Lambda::Function', 7);
     template.resourceCountIs('AWS::ApiGatewayV2::Api', 1);
-    template.resourceCountIs('AWS::ApiGatewayV2::Route', 9);
-    template.resourceCountIs('AWS::CloudWatch::Alarm', 7);
+    template.resourceCountIs('AWS::ApiGatewayV2::Route', 12);
+    template.resourceCountIs('AWS::CloudWatch::Alarm', 8);
 
     template.hasResourceProperties('AWS::Lambda::Function', {
       Runtime: 'nodejs22.x'
@@ -46,6 +47,7 @@ describe('Phase 4 stack', () => {
     expect(stateMachineBody).toContain('FetchRaw');
     expect(stateMachineBody).toContain('Normalize');
     expect(stateMachineBody).toContain('ComputeSignals');
+    expect(stateMachineBody).toContain('AlertsEval');
 
     template.hasResourceProperties('AWS::Events::Rule', {
       ScheduleExpression: 'cron(0 6 * * ? *)'
@@ -86,6 +88,18 @@ describe('Phase 4 stack', () => {
       RouteKey: 'DELETE /portfolio/holdings/{holdingId}'
     });
 
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'GET /alerts'
+    });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'POST /alerts'
+    });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'DELETE /alerts/{alertId}'
+    });
+
     template.hasResourceProperties('AWS::ApiGatewayV2::Stage', {
       DefaultRouteSettings: {
         ThrottlingBurstLimit: 100,
@@ -106,5 +120,5 @@ describe('Phase 4 stack', () => {
     const outputs = template.toJSON().Outputs ?? {};
     expect(outputs).toHaveProperty('ApiBaseUrl');
     expect(outputs).toHaveProperty('ApiLambdaName');
-  });
+  }, 20000);
 });

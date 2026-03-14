@@ -1,6 +1,6 @@
 import type { ErrorCode } from '../errors/error-codes';
 import type { PriceRange } from '../constants';
-import type { Card, HoldingCondition, HoldingVariant } from './entities';
+import type { AlertType, Card, HoldingCondition, HoldingVariant } from './entities';
 
 export interface ApiErrorShape {
   code: ErrorCode;
@@ -130,4 +130,27 @@ export interface PortfolioSummary {
 export interface PortfolioResponse {
   summary: PortfolioSummary;
   holdings: PortfolioHoldingValuation[];
+}
+
+export interface CreateAlertRequest {
+  cardId: string;
+  type: AlertType;
+  thresholdCents: number;
+  cooldownHours: number;
+  notifyEmail: string;
+}
+
+export interface AlertResponse extends CreateAlertRequest {
+  alertId: string;
+  userId: string;
+  enabled: boolean;
+  lastTriggeredAt?: string | undefined;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+  requestHash?: string | undefined;
+}
+
+export interface AlertsListResponse {
+  alerts: AlertResponse[];
 }

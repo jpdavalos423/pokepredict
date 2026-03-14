@@ -126,3 +126,14 @@ export const computeSignalsResultSchema = z.object({
   processedCount: z.number().int().nonnegative(),
   updatedCardIds: z.array(z.string().min(1))
 });
+
+export const alertsEvalResultSchema = z.object({
+  runId: z.string().min(1),
+  asOf: z.string().datetime(),
+  source: z.string().min(1),
+  mode: z.enum(['scheduled', 'manual']),
+  startedAt: z.string().datetime(),
+  processedCardCount: z.number().int().nonnegative(),
+  triggeredAlertCount: z.number().int().nonnegative(),
+  sentNotificationCount: z.number().int().nonnegative()
+});

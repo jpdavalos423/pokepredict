@@ -3,6 +3,9 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda
 import { createApiDependencies, type ApiDependencies } from './dependencies';
 import { parseRequestContext } from './middleware/request';
 import { errorResponse } from './middleware/response';
+import { createAlertRoute } from './routes/alerts/createAlert';
+import { deleteAlertRoute } from './routes/alerts/deleteAlert';
+import { getAlertsRoute } from './routes/alerts/getAlerts';
 import { getCardByIdRoute } from './routes/cards/getById';
 import { listCardsRoute } from './routes/cards/list';
 import { healthRoute } from './routes/health';
@@ -54,8 +57,16 @@ export function createHandler(factory: DependenciesFactory = createApiDependenci
         return await getPortfolioRoute(req, await getDeps());
       }
 
+      if (req.method === 'GET' && req.path === '/alerts') {
+        return await getAlertsRoute(req, await getDeps());
+      }
+
       if (req.method === 'POST' && req.path === '/portfolio/holdings') {
         return await createHoldingRoute(req, await getDeps());
+      }
+
+      if (req.method === 'POST' && req.path === '/alerts') {
+        return await createAlertRoute(req, await getDeps());
       }
 
       if (req.method === 'GET') {
@@ -81,6 +92,15 @@ export function createHandler(factory: DependenciesFactory = createApiDependenci
       }
 
       if (req.method === 'DELETE') {
+        const deleteAlertMatch = req.path.match(/^\/alerts\/([^/]+)$/);
+        if (deleteAlertMatch?.[1]) {
+          return await deleteAlertRoute(
+            req,
+            await getDeps(),
+            decodePathSegment(deleteAlertMatch[1])
+          );
+        }
+
         const deleteHoldingMatch = req.path.match(/^\/portfolio\/holdings\/([^/]+)$/);
         if (deleteHoldingMatch?.[1]) {
           return await deleteHoldingRoute(
