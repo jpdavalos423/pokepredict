@@ -22,7 +22,7 @@ import type {
   PriceHistoryData
 } from './api/types';
 
-export type { ApiClientError } from './api/request';
+export { ApiClientError } from './api/request';
 export { apiEndpoints, buildApiUrl, getApiBaseUrl, unwrapApiResponse };
 export type * from './api/types';
 
