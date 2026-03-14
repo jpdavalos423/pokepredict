@@ -51,3 +51,13 @@ After deploy, verify:
 5. `GET /cards/<cardId>/price/latest`
 6. `GET /cards/<cardId>/prices?range=30d`
 7. Cursor tamper check (`cursor` modified) returns `400 INVALID_CURSOR`.
+
+## Endpoint Usability Verifier
+Run the deterministic live verifier (includes a manual `tcgdex` ingestion trigger by default):
+```bash
+API_PROXY_TARGET=<api_base_url> pnpm verify:price:endpoints
+```
+
+Optional knobs:
+- `INGESTION_ARN` (or `.phase1.env`) to locate the state machine
+- `SKIP_INGESTION=1` to run checks without triggering a new ingestion

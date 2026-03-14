@@ -29,6 +29,21 @@ export interface PokepredictStackProps extends StackProps {
   cursorSigningSecretParam: string;
   cursorSigningSecretVersion: number;
   sesFromEmail: string;
+  fetchRawTimeoutSeconds: number;
+  normalizeTimeoutSeconds: number;
+  stateMachineTimeoutMinutes: number;
+  tcgdex: {
+    baseUrl: string;
+    listPath: string;
+    detailPathTemplate: string;
+    pageSize: number;
+    maxPages: number;
+    detailConcurrency: number;
+    maxRetries: number;
+    retryBaseDelayMs: number;
+    requestTimeoutMs: number;
+    failureRateThreshold: string;
+  };
 }
 
 export class PokepredictStack extends Stack {
@@ -116,6 +131,31 @@ export class PokepredictStack extends Stack {
     };
 
     const pipelineSrcPath = path.resolve(__dirname, '../../../apps/pipeline/src/handlers');
+    const tcgdexEnv = {
+      TCGDEX_BASE_URL: props.tcgdex.baseUrl,
+      TCGDEX_LIST_PATH: props.tcgdex.listPath,
+      TCGDEX_DETAIL_PATH_TEMPLATE: props.tcgdex.detailPathTemplate,
+      TCGDEX_PAGE_SIZE: String(props.tcgdex.pageSize),
+      TCGDEX_MAX_PAGES: String(props.tcgdex.maxPages),
+      TCGDEX_DETAIL_CONCURRENCY: String(props.tcgdex.detailConcurrency),
+      TCGDEX_MAX_RETRIES: String(props.tcgdex.maxRetries),
+      TCGDEX_RETRY_BASE_DELAY_MS: String(props.tcgdex.retryBaseDelayMs),
+      TCGDEX_REQUEST_TIMEOUT_MS: String(props.tcgdex.requestTimeoutMs),
+      TCGDEX_FAILURE_RATE_THRESHOLD: props.tcgdex.failureRateThreshold
+    };
+    const pipelineEnvironment = {
+      RAW_BUCKET: rawBucket.bucketName,
+      SOURCE_NAME: props.sourceName,
+      TABLE_CARDS: cardsTable.tableName,
+      TABLE_PRICES: pricesTable.tableName,
+      TABLE_LATEST_PRICES: latestPricesTable.tableName,
+      TABLE_SIGNALS: signalsTable.tableName,
+      TABLE_ALERTS_BY_USER: alertsByUserTable.tableName,
+      TABLE_ALERTS_BY_CARD: alertsByCardTable.tableName,
+      SES_FROM_EMAIL: props.sesFromEmail,
+      ...tcgdexEnv
+    };
+
     const startRunFunction = new lambdaNodejs.NodejsFunction(this, 'StartRunFunction', {
       runtime: lambda.Runtime.NODEJS_22_X,
       entry: path.join(pipelineSrcPath, 'startRun.ts'),
@@ -128,38 +168,18 @@ export class PokepredictStack extends Stack {
       runtime: lambda.Runtime.NODEJS_22_X,
       entry: path.join(pipelineSrcPath, 'fetchRaw.ts'),
       handler: 'handler',
-      timeout: Duration.seconds(60),
+      timeout: Duration.seconds(props.fetchRawTimeoutSeconds),
       bundling,
-      environment: {
-        RAW_BUCKET: rawBucket.bucketName,
-        SOURCE_NAME: props.sourceName,
-        TABLE_CARDS: cardsTable.tableName,
-        TABLE_PRICES: pricesTable.tableName,
-        TABLE_LATEST_PRICES: latestPricesTable.tableName,
-        TABLE_SIGNALS: signalsTable.tableName,
-        TABLE_ALERTS_BY_USER: alertsByUserTable.tableName,
-        TABLE_ALERTS_BY_CARD: alertsByCardTable.tableName,
-        SES_FROM_EMAIL: props.sesFromEmail
-      }
+      environment: pipelineEnvironment
     });
 
     const normalizeFunction = new lambdaNodejs.NodejsFunction(this, 'NormalizeFunction', {
       runtime: lambda.Runtime.NODEJS_22_X,
       entry: path.join(pipelineSrcPath, 'normalize.ts'),
       handler: 'handler',
-      timeout: Duration.seconds(120),
+      timeout: Duration.seconds(props.normalizeTimeoutSeconds),
       bundling,
-      environment: {
-        RAW_BUCKET: rawBucket.bucketName,
-        SOURCE_NAME: props.sourceName,
-        TABLE_CARDS: cardsTable.tableName,
-        TABLE_PRICES: pricesTable.tableName,
-        TABLE_LATEST_PRICES: latestPricesTable.tableName,
-        TABLE_SIGNALS: signalsTable.tableName,
-        TABLE_ALERTS_BY_USER: alertsByUserTable.tableName,
-        TABLE_ALERTS_BY_CARD: alertsByCardTable.tableName,
-        SES_FROM_EMAIL: props.sesFromEmail
-      }
+      environment: pipelineEnvironment
     });
 
     const computeSignalsFunction = new lambdaNodejs.NodejsFunction(this, 'ComputeSignalsFunction', {
@@ -168,17 +188,7 @@ export class PokepredictStack extends Stack {
       handler: 'handler',
       timeout: Duration.seconds(120),
       bundling,
-      environment: {
-        RAW_BUCKET: rawBucket.bucketName,
-        SOURCE_NAME: props.sourceName,
-        TABLE_CARDS: cardsTable.tableName,
-        TABLE_PRICES: pricesTable.tableName,
-        TABLE_LATEST_PRICES: latestPricesTable.tableName,
-        TABLE_SIGNALS: signalsTable.tableName,
-        TABLE_ALERTS_BY_USER: alertsByUserTable.tableName,
-        TABLE_ALERTS_BY_CARD: alertsByCardTable.tableName,
-        SES_FROM_EMAIL: props.sesFromEmail
-      }
+      environment: pipelineEnvironment
     });
 
     const alertsEvalFunction = new lambdaNodejs.NodejsFunction(this, 'AlertsEvalFunction', {
@@ -187,17 +197,7 @@ export class PokepredictStack extends Stack {
       handler: 'handler',
       timeout: Duration.seconds(120),
       bundling,
-      environment: {
-        RAW_BUCKET: rawBucket.bucketName,
-        SOURCE_NAME: props.sourceName,
-        TABLE_CARDS: cardsTable.tableName,
-        TABLE_PRICES: pricesTable.tableName,
-        TABLE_LATEST_PRICES: latestPricesTable.tableName,
-        TABLE_SIGNALS: signalsTable.tableName,
-        TABLE_ALERTS_BY_USER: alertsByUserTable.tableName,
-        TABLE_ALERTS_BY_CARD: alertsByCardTable.tableName,
-        SES_FROM_EMAIL: props.sesFromEmail
-      }
+      environment: pipelineEnvironment
     });
 
     const apiSrcPath = path.resolve(__dirname, '../../../apps/api/src/handler.ts');
@@ -289,7 +289,7 @@ export class PokepredictStack extends Stack {
     const stateMachine = new sfn.StateMachine(this, 'IngestionStateMachine', {
       stateMachineName: `${prefix}-ingestion`,
       definitionBody: sfn.DefinitionBody.fromChainable(definition),
-      timeout: Duration.minutes(10)
+      timeout: Duration.minutes(props.stateMachineTimeoutMinutes)
     });
 
     new events.Rule(this, 'IngestionScheduleRule', {

@@ -1,5 +1,5 @@
 import type { RawPriceRecord, StartRunResult } from '@pokepredict/shared';
-import type { PriceSourceProvider } from './types';
+import type { PriceSourceFetchResult, PriceSourceProvider } from './types';
 
 const BASE_FIXTURE_ROWS: Array<{
   sourceCardId: string;
@@ -16,8 +16,8 @@ const BASE_FIXTURE_ROWS: Array<{
 ];
 
 export class FixturePriceSourceProvider implements PriceSourceProvider {
-  async fetch(context: StartRunResult): Promise<RawPriceRecord[]> {
-    return BASE_FIXTURE_ROWS.map((row) => {
+  async fetch(context: StartRunResult): Promise<PriceSourceFetchResult> {
+    const records = BASE_FIXTURE_ROWS.map((row) => {
       const record: RawPriceRecord = {
         sourceCardId: row.sourceCardId,
         recordedAt: context.asOf,
@@ -35,5 +35,20 @@ export class FixturePriceSourceProvider implements PriceSourceProvider {
 
       return record;
     });
+
+    return {
+      records,
+      metrics: {
+        totalCardsScanned: BASE_FIXTURE_ROWS.length,
+        cardsWithDetailFetched: BASE_FIXTURE_ROWS.length,
+        cardsSuccessfullyMapped: records.length,
+        cardsSkipped: 0,
+        skipReasonCounts: {},
+        requestFailures: 0,
+        retryCount: 0,
+        upstreamFailureRate: 0,
+        runDurationMs: 0
+      }
+    };
   }
 }

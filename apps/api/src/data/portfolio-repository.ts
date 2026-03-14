@@ -65,6 +65,10 @@ function asOptionalString(value: unknown): string | undefined {
   return value;
 }
 
+function centsToUsdDecimal(cents: number): number {
+  return cents / 100;
+}
+
 function toHoldingResponse(item: Record<string, unknown>): HoldingResponse {
   const holding: HoldingResponse = {
     holdingId: asString(item.holdingId, 'holdingId'),
@@ -95,10 +99,12 @@ function toHoldingResponse(item: Record<string, unknown>): HoldingResponse {
 }
 
 function toLatestPrice(item: Record<string, unknown>): LatestPriceResponse {
+  const marketCents = asNumber(item.marketCents, 'marketCents');
   const latest: LatestPriceResponse = {
     cardId: asString(item.cardId, 'cardId'),
     asOf: asString(item.asOf, 'asOf'),
-    marketCents: asNumber(item.marketCents, 'marketCents'),
+    marketCents,
+    marketPrice: centsToUsdDecimal(marketCents),
     currency: 'USD',
     source: asString(item.source, 'source')
   };

@@ -5,6 +5,7 @@ import type {
   StartRunResult
 } from '@pokepredict/shared';
 import { createFetchRawHandler } from '../src/handlers/fetchRaw';
+import type { PriceSourceFetchResult } from '../src/providers/types';
 
 describe('fetchRaw handler', () => {
   it('archives raw payload and returns key metadata', async () => {
@@ -20,10 +21,24 @@ describe('fetchRaw handler', () => {
         currency: 'USD'
       }
     ];
+    const fetchResult: PriceSourceFetchResult = {
+      records,
+      metrics: {
+        totalCardsScanned: 1,
+        cardsWithDetailFetched: 1,
+        cardsSuccessfullyMapped: 1,
+        cardsSkipped: 0,
+        skipReasonCounts: {},
+        requestFailures: 0,
+        retryCount: 0,
+        upstreamFailureRate: 0,
+        runDurationMs: 200
+      }
+    };
 
     const handler = createFetchRawHandler({
       now: () => '2026-03-04T18:01:00.000Z',
-      fetchRecords: async () => records,
+      fetchFromSource: async () => fetchResult,
       putRawPayload: async (key, payload) => {
         captured.key = key;
         captured.payload = payload;

@@ -13,7 +13,22 @@ describe('Phase 5 stack', () => {
       ingestScheduleCron: 'cron(0 6 * * ? *)',
       cursorSigningSecretParam: '/pokepredict/dev/cursor-signing-secret',
       cursorSigningSecretVersion: 1,
-      sesFromEmail: 'alerts+dev@pokepredict.dev'
+      sesFromEmail: 'alerts+dev@pokepredict.dev',
+      fetchRawTimeoutSeconds: 300,
+      normalizeTimeoutSeconds: 300,
+      stateMachineTimeoutMinutes: 30,
+      tcgdex: {
+        baseUrl: 'https://api.tcgdex.net/v2/en',
+        listPath: '/cards',
+        detailPathTemplate: '/cards/{id}',
+        pageSize: 100,
+        maxPages: 0,
+        detailConcurrency: 8,
+        maxRetries: 2,
+        retryBaseDelayMs: 250,
+        requestTimeoutMs: 10000,
+        failureRateThreshold: '0.25'
+      }
     });
 
     const template = Template.fromStack(stack);
@@ -37,6 +52,16 @@ describe('Phase 5 stack', () => {
           TABLE_CARDS: Match.anyValue(),
           TABLE_PRICES: Match.anyValue(),
           TABLE_LATEST_PRICES: Match.anyValue()
+        })
+      }
+    });
+
+    template.hasResourceProperties('AWS::Lambda::Function', {
+      Timeout: 300,
+      Environment: {
+        Variables: Match.objectLike({
+          TCGDEX_BASE_URL: 'https://api.tcgdex.net/v2/en',
+          TCGDEX_DETAIL_CONCURRENCY: '8'
         })
       }
     });

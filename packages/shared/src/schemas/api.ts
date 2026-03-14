@@ -78,10 +78,29 @@ export const latestPriceResponseSchema = z.object({
   cardId: z.string().min(1),
   asOf: z.string().datetime(),
   marketCents: z.int().nonnegative(),
+  marketPrice: z.number().nonnegative(),
   lowCents: z.int().nonnegative().optional(),
   highCents: z.int().nonnegative().optional(),
   currency: z.literal('USD'),
   source: z.string().min(1)
+});
+
+export const priceHistoryPointSchema = z.object({
+  ts: z.string().datetime(),
+  marketCents: z.int().nonnegative(),
+  marketPrice: z.number().nonnegative(),
+  lowCents: z.int().nonnegative().optional(),
+  highCents: z.int().nonnegative().optional(),
+  currency: z.literal('USD'),
+  source: z.string().min(1)
+});
+
+export const priceHistoryResponseSchema = z.object({
+  cardId: z.string().min(1),
+  range: priceRangeSchema,
+  from: z.string().datetime(),
+  to: z.string().datetime(),
+  points: z.array(priceHistoryPointSchema)
 });
 
 export const holdingResponseSchema = createHoldingRequestSchema.extend({

@@ -352,6 +352,7 @@ describe('Phase 3 portfolio routes', () => {
             cardId: 'sv3-198',
             asOf: '2026-03-05T00:00:00.000Z',
             marketCents: 1200,
+            marketPrice: 12,
             currency: 'USD',
             source: 'fixture'
           }

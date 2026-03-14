@@ -1,7 +1,7 @@
 # Pokepredict API Contract
 
 Version: v1  
-Last Updated: March 12, 2026
+Last Updated: March 14, 2026
 
 Base: API Gateway HTTP API
 
@@ -98,12 +98,64 @@ Returns card detail.
 
 ### GET /cards/{cardId}/price/latest
 Returns latest normalized price snapshot.
+- `marketPrice` is a numeric USD decimal derived from `marketCents / 100`.
+- Treat `marketPrice` as a number, not a formatted currency string.
 - `404 PRICE_NOT_FOUND` if no ingested price exists.
+
+Success `200` sample:
+```json
+{
+  "ok": true,
+  "data": {
+    "cardId": "sv3-198",
+    "asOf": "2026-03-11T06:00:00.000Z",
+    "marketCents": 11000,
+    "marketPrice": 110,
+    "lowCents": 10500,
+    "highCents": 11500,
+    "currency": "USD",
+    "source": "tcgdex"
+  },
+  "error": null
+}
+```
 
 ### GET /cards/{cardId}/prices?range=30d|90d|1y
 Returns ordered time-series points.
+- Every returned point includes both `marketCents` and `marketPrice`.
+- Each point's `marketPrice` is derived from that same point's `marketCents / 100`.
 - Invalid range: `422 VALIDATION_ERROR`
 - Empty result is valid `200` with `points: []`
+
+Success `200` sample:
+```json
+{
+  "ok": true,
+  "data": {
+    "cardId": "sv3-198",
+    "range": "30d",
+    "from": "2026-02-10T00:00:00.000Z",
+    "to": "2026-03-12T00:00:00.000Z",
+    "points": [
+      {
+        "ts": "2026-03-10T06:00:00.000Z",
+        "marketCents": 10000,
+        "marketPrice": 100,
+        "currency": "USD",
+        "source": "tcgdex"
+      },
+      {
+        "ts": "2026-03-11T06:00:00.000Z",
+        "marketCents": 11000,
+        "marketPrice": 110,
+        "currency": "USD",
+        "source": "tcgdex"
+      }
+    ]
+  },
+  "error": null
+}
+```
 
 ### GET /cards/{cardId}/signals/latest
 Returns latest signals record.
@@ -224,6 +276,7 @@ Cooldown:
 - `ALERT_NOT_FOUND`
 
 ## Changelog
+- v1 (March 14, 2026): Added `marketPrice` numeric alias on `GET /cards/{cardId}/price/latest` and `GET /cards/{cardId}/prices` points. `marketCents` remains canonical and unchanged.
 - v1 (March 12, 2026): Phase 5 updates: alerts CRUD endpoints (`GET/POST/DELETE /alerts*`), idempotent create semantics, and pipeline `AlertsEval` + SES delivery behavior.
 - v1 (March 6, 2026): Phase 4 updates: implemented `GET /cards/{cardId}/signals/latest` backed by persisted `Signals` records from pipeline `ComputeSignals`.
 - v1 (March 5, 2026): Phase 3 portfolio contract finalized: `GET /portfolio`, `POST /portfolio/holdings`, `DELETE /portfolio/holdings/{holdingId}`, idempotency conflict semantics, and zero-market-value behavior for missing latest prices.

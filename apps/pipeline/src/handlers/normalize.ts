@@ -152,12 +152,14 @@ export function buildLatestPriceUpdate(
 
 export function createNormalizeHandler(deps: NormalizeDependencies): (event: FetchRawResult) => Promise<NormalizeResult> {
   return async function normalizeHandler(event: FetchRawResult): Promise<NormalizeResult> {
+    const normalizeStartedMs = Date.now();
     const input = fetchRawResultSchema.parse(event);
     const payload = rawFetchPayloadSchema.parse(await deps.readRawPayload(input.rawS3Key));
 
     const updatedCardIds = new Set<string>();
     let processedCount = 0;
     let skippedCount = 0;
+    const skipReasonCounts: Record<string, number> = {};
     const timestamp = deps.now();
 
     for (const rawRecord of payload.records) {
@@ -166,6 +168,7 @@ export function createNormalizeHandler(deps: NormalizeDependencies): (event: Fet
 
       if (!exists) {
         skippedCount += 1;
+        skipReasonCounts['unknown card ID'] = (skipReasonCounts['unknown card ID'] ?? 0) + 1;
         logWarn('Skipping raw price record due to missing card mapping.', {
           step: 'Normalize',
           runId: input.runId,
@@ -212,7 +215,11 @@ export function createNormalizeHandler(deps: NormalizeDependencies): (event: Fet
       runId: input.runId,
       processedCount,
       skippedCount,
-      updatedCardIds: result.updatedCardIds
+      totalRecords,
+      normalizeSkipRatio: skipRatio,
+      skipReasonCounts,
+      updatedCardIds: result.updatedCardIds,
+      runDurationMs: Date.now() - normalizeStartedMs
     });
 
     return result;
