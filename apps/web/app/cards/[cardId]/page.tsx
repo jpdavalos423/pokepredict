@@ -1,8 +1,8 @@
 'use client';
 
 import type { PriceRange } from '@pokepredict/shared';
-import Link from 'next/link';
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiClient } from '../../../lib/api-client';
 import { formatIsoDate, formatIsoDateTime, formatPercentFromBps, formatUsdFromCents } from '../../../lib/format';
 import { getRequestErrorMessage } from '../../../lib/request-error';
@@ -11,6 +11,7 @@ import {
   Badge,
   Button,
   Card,
+  CardImage,
   EmptyState,
   ErrorBanner,
   LoadingSkeleton,
@@ -54,6 +55,7 @@ function getTrendTone(
 }
 
 export default function CardDetailPage({ params }: CardDetailPageProps) {
+  const router = useRouter();
   const { cardId: rawCardId } = use(params);
   const cardId = decodeURIComponent(rawCardId);
   const [range, setRange] = useState<PriceRange>('90d');
@@ -154,6 +156,15 @@ export default function CardDetailPage({ params }: CardDetailPageProps) {
     return `${data.priceHistory.points.length} points from ${formatIsoDate(data.priceHistory.from)} to ${formatIsoDate(data.priceHistory.to)}`;
   }, [data]);
 
+  const onBackToMarket = useCallback(() => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+
+    router.push('/market');
+  }, [router]);
+
   if (isNotFound) {
     return (
       <PageContainer>
@@ -161,11 +172,7 @@ export default function CardDetailPage({ params }: CardDetailPageProps) {
         <EmptyState
           title="Card not found"
           description="The requested card does not exist in the current catalog."
-          action={
-            <Link href="/market">
-              <Button variant="secondary">Back to Market</Button>
-            </Link>
-          }
+          action={<Button variant="secondary" onClick={onBackToMarket}>Back to Market</Button>}
         />
       </PageContainer>
     );
@@ -180,11 +187,7 @@ export default function CardDetailPage({ params }: CardDetailPageProps) {
             ? `${data.card.set.name} (${data.card.set.id}) · #${data.card.number}`
             : `Card ID: ${cardId}`
         }
-        action={
-          <Link href="/market">
-            <Button variant="secondary">Back to Market</Button>
-          </Link>
-        }
+        action={<Button variant="secondary" onClick={onBackToMarket}>Back to Market</Button>}
       />
 
       {errorMessage ? (
@@ -323,15 +326,14 @@ export default function CardDetailPage({ params }: CardDetailPageProps) {
             <Card>
               <h2>Card Metadata</h2>
               <div className="card-detail-meta-grid">
-                {data.card.imageUrl ? (
-                  <img
-                    className="card-detail-thumb"
-                    src={data.card.imageUrl}
-                    alt={`${data.card.name} thumbnail`}
-                  />
-                ) : (
-                  <div className="card-detail-thumb card-detail-thumb-fallback">No image</div>
-                )}
+                <CardImage
+                  className="card-detail-thumb"
+                  imageUrl={data.card.imageUrl}
+                  setId={data.card.set.id}
+                  number={data.card.number}
+                  alt={`${data.card.name} thumbnail`}
+                  fallback={<div className="card-detail-thumb card-detail-thumb-fallback">No image</div>}
+                />
                 <div className="card-detail-stat-stack">
                   <p className="card-detail-meta-copy">Card ID: {data.card.cardId}</p>
                   <p className="card-detail-meta-copy">

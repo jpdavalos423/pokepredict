@@ -35,7 +35,9 @@ export interface PokepredictStackProps extends StackProps {
   tcgdex: {
     baseUrl: string;
     listPath: string;
+    setsPath: string;
     detailPathTemplate: string;
+    excludedSeriesIds: string;
     pageSize: number;
     maxPages: number;
     detailConcurrency: number;
@@ -134,7 +136,9 @@ export class PokepredictStack extends Stack {
     const tcgdexEnv = {
       TCGDEX_BASE_URL: props.tcgdex.baseUrl,
       TCGDEX_LIST_PATH: props.tcgdex.listPath,
+      TCGDEX_SETS_PATH: props.tcgdex.setsPath,
       TCGDEX_DETAIL_PATH_TEMPLATE: props.tcgdex.detailPathTemplate,
+      TCGDEX_EXCLUDED_SERIES_IDS: props.tcgdex.excludedSeriesIds,
       TCGDEX_PAGE_SIZE: String(props.tcgdex.pageSize),
       TCGDEX_MAX_PAGES: String(props.tcgdex.maxPages),
       TCGDEX_DETAIL_CONCURRENCY: String(props.tcgdex.detailConcurrency),
@@ -186,7 +190,7 @@ export class PokepredictStack extends Stack {
       runtime: lambda.Runtime.NODEJS_22_X,
       entry: path.join(pipelineSrcPath, 'computeSignals.ts'),
       handler: 'handler',
-      timeout: Duration.seconds(120),
+      timeout: Duration.seconds(props.fetchRawTimeoutSeconds),
       bundling,
       environment: pipelineEnvironment
     });
@@ -195,7 +199,7 @@ export class PokepredictStack extends Stack {
       runtime: lambda.Runtime.NODEJS_22_X,
       entry: path.join(pipelineSrcPath, 'alertsEval.ts'),
       handler: 'handler',
-      timeout: Duration.seconds(120),
+      timeout: Duration.seconds(props.fetchRawTimeoutSeconds),
       bundling,
       environment: pipelineEnvironment
     });

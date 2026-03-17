@@ -6,7 +6,7 @@
     "setName": "151",
     "number": "198",
     "rarity": "Special Illustration Rare",
-    "imageUrl": "https://images.pokepredict.dev/cards/sv3-198.png"
+    "imageUrl": "https://images.pokemontcg.io/sv3/198_hires.png"
   },
   {
     "cardId": "sv3-169",
@@ -15,7 +15,7 @@
     "setName": "151",
     "number": "169",
     "rarity": "Ultra Rare",
-    "imageUrl": "https://images.pokepredict.dev/cards/sv3-169.png"
+    "imageUrl": "https://images.pokemontcg.io/sv3/169_hires.png"
   },
   {
     "cardId": "swsh12-TG30",
@@ -24,7 +24,7 @@
     "setName": "Silver Tempest",
     "number": "TG30",
     "rarity": "Trainer Gallery",
-    "imageUrl": "https://images.pokepredict.dev/cards/swsh12-TG30.png"
+    "imageUrl": "https://images.pokemontcg.io/swsh12/TG30_hires.png"
   },
   {
     "cardId": "sv2-203",
@@ -33,7 +33,7 @@
     "setName": "Paldea Evolved",
     "number": "203",
     "rarity": "Special Illustration Rare",
-    "imageUrl": "https://images.pokepredict.dev/cards/sv2-203.png"
+    "imageUrl": "https://images.pokemontcg.io/sv2/203_hires.png"
   },
   {
     "cardId": "base1-4",
@@ -42,6 +42,6 @@
     "setName": "Base Set",
     "number": "4",
     "rarity": "Holo Rare",
-    "imageUrl": "https://images.pokepredict.dev/cards/base1-4.png"
+    "imageUrl": "https://images.pokemontcg.io/base1/4_hires.png"
   }
 ]

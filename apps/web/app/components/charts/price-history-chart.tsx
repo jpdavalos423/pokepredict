@@ -117,6 +117,8 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
   const lastPoint = sortedPoints[sortedPoints.length - 1];
   const xAxisLabels = [firstPoint, midPoint, lastPoint].filter(
     (point): point is PriceHistoryPoint => Boolean(point)
+  ).filter(
+    (point, index, points) => points.findIndex((candidate) => candidate.ts === point.ts) === index
   );
 
   return (
@@ -129,11 +131,11 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
           </linearGradient>
         </defs>
 
-        {yAxisTicks.map((tick) => {
+        {yAxisTicks.map((tick, index) => {
           const ratio = (tick - min) / (max - min);
           const y = PADDING_TOP + (1 - ratio) * (CHART_HEIGHT - PADDING_TOP - PADDING_BOTTOM);
           return (
-            <g key={tick}>
+            <g key={`${tick}-${index}`}>
               <line
                 className="price-chart-grid-line"
                 x1={PADDING_LEFT}
@@ -161,7 +163,7 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
           />
         ))}
 
-        {xAxisLabels.map((point) => {
+        {xAxisLabels.map((point, index) => {
           const chartPoint = chartPoints.find((entry) => entry.ts === point.ts);
           if (!chartPoint) {
             return null;
@@ -169,7 +171,7 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
 
           return (
             <text
-              key={`${point.ts}-label`}
+              key={`${point.ts}-${index}-label`}
               className="price-chart-axis-label"
               x={chartPoint.x}
               y={CHART_HEIGHT - 10}

@@ -18,6 +18,43 @@ Required env vars:
 - `AWS_REGION`
 - `TABLE_CARDS`
 
+To seed cards from TCGdex while excluding out-of-scope series (default: `tcgp`):
+```bash
+TCGDEX_EXCLUDED_SERIES_IDS=tcgp pnpm generate:data:tcgdex
+```
+
+## TCG Pocket Purge
+Dry-run first:
+```bash
+AWS_REGION=us-west-2 \
+TABLE_CARDS=<cards_table> \
+TABLE_PRICES=<prices_table> \
+TABLE_LATEST_PRICES=<latest_prices_table> \
+TABLE_HOLDINGS=<holdings_table> \
+TABLE_ALERTS_BY_USER=<alerts_by_user_table> \
+TABLE_ALERTS_BY_CARD=<alerts_by_card_table> \
+TABLE_SIGNALS=<signals_table> \
+pnpm purge:tcgp:dry-run
+```
+
+Execute once dry-run output is reviewed:
+```bash
+AWS_REGION=us-west-2 \
+TABLE_CARDS=<cards_table> \
+TABLE_PRICES=<prices_table> \
+TABLE_LATEST_PRICES=<latest_prices_table> \
+TABLE_HOLDINGS=<holdings_table> \
+TABLE_ALERTS_BY_USER=<alerts_by_user_table> \
+TABLE_ALERTS_BY_CARD=<alerts_by_card_table> \
+TABLE_SIGNALS=<signals_table> \
+pnpm purge:tcgp:execute
+```
+
+Optional scope knobs:
+- `TCGDEX_BASE_URL` (default `https://api.tcgdex.net/v2/en`)
+- `TCGDEX_SETS_PATH` (default `/sets`)
+- `TCGDEX_EXCLUDED_SERIES_IDS` (default `tcgp`)
+
 ## Pipeline Manual Trigger
 Start the Step Functions state machine with input:
 ```json

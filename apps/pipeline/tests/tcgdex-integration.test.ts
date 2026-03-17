@@ -22,7 +22,9 @@ function createProviderOptions(): TcgdexProviderOptions {
   return {
     baseUrl: 'https://api.tcgdex.net/v2/en',
     listPath: '/cards',
+    setsPath: '/sets',
     detailPathTemplate: '/cards/{id}',
+    excludedSeriesIds: ['tcgp'],
     pageSize: 3,
     maxPages: 0,
     detailConcurrency: 3,
@@ -39,6 +41,29 @@ function createTcgdexFetch(
 ): (url: string | URL) => Promise<Response> {
   return async (url: string | URL) => {
     const parsedUrl = new URL(String(url));
+    if (parsedUrl.pathname.includes('/series/')) {
+      return new Response(
+        JSON.stringify({
+          id: 'tcgp',
+          sets: [{ id: 'A1' }]
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      );
+    }
+
+    if (parsedUrl.pathname.endsWith('/sets')) {
+      return new Response(
+        JSON.stringify([
+          { id: 'A1', serie: { id: 'tcgp' } },
+          { id: 'sv3', serie: { id: 'sv' } },
+          { id: 'swsh12', serie: { id: 'swsh' } },
+          { id: 'sv2', serie: { id: 'sv' } },
+          { id: 'base1', serie: { id: 'base' } }
+        ]),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      );
+    }
+
     if (parsedUrl.pathname.endsWith('/cards')) {
       const pageParam = parsedUrl.searchParams.get('page') ?? parsedUrl.searchParams.get('pagination:page') ?? '1';
       const page = Number.parseInt(pageParam, 10);

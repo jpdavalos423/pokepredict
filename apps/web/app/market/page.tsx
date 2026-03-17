@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { apiClient, unwrapApiResponse } from '../../lib/api-client';
 import { getRequestErrorMessage } from '../../lib/request-error';
@@ -8,6 +8,7 @@ import {
   Badge,
   Button,
   Card,
+  CardImage,
   EmptyState,
   ErrorBanner,
   Input,
@@ -23,6 +24,70 @@ interface MarketFilters {
 }
 
 const DEFAULT_LIMIT = 24;
+const MARKET_STATE_STORAGE_KEY = 'pokepredict:market-page-state:v1';
+const MARKET_STATE_VERSION = 1;
+
+interface PersistedMarketState {
+  version: number;
+  queryInput: string;
+  setInput: string;
+  appliedFilters: MarketFilters | null;
+  cards: CardListItem[];
+  cursor: string | null;
+  scrollY: number;
+}
+
+function isPersistedMarketState(value: unknown): value is PersistedMarketState {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<PersistedMarketState>;
+
+  return (
+    candidate.version === MARKET_STATE_VERSION &&
+    typeof candidate.queryInput === 'string' &&
+    typeof candidate.setInput === 'string' &&
+    (candidate.appliedFilters === null || typeof candidate.appliedFilters === 'object') &&
+    Array.isArray(candidate.cards) &&
+    (candidate.cursor === null || typeof candidate.cursor === 'string') &&
+    typeof candidate.scrollY === 'number'
+  );
+}
+
+function readPersistedMarketState(): PersistedMarketState | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const serialized = window.sessionStorage.getItem(MARKET_STATE_STORAGE_KEY);
+    if (!serialized) {
+      return null;
+    }
+
+    const parsed = JSON.parse(serialized) as unknown;
+    if (!isPersistedMarketState(parsed)) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedMarketState(state: PersistedMarketState): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(MARKET_STATE_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore storage failures (e.g. private mode quotas) and continue without persistence.
+  }
+}
 
 function validateMarketFilters(filters: MarketFilters): string | null {
   if (!filters.query && !filters.set) {
@@ -40,17 +105,21 @@ function validateMarketFilters(filters: MarketFilters): string | null {
   return null;
 }
 
-function MarketCard({ card }: { card: CardListItem }) {
+function MarketCard({ card, onViewCard }: { card: CardListItem; onViewCard: () => void }) {
   return (
     <Card className="market-card" variant="elevated">
       <div className="market-card-body">
-        {card.imageUrl ? (
-          <div className="market-card-image-wrap">
-            <img className="market-card-image" src={card.imageUrl} alt={`${card.name} card art`} />
-          </div>
-        ) : (
-          <div className="market-card-image-fallback">No image</div>
-        )}
+        <div className="market-card-image-wrap">
+          <CardImage
+            className="market-card-image"
+            imageUrl={card.imageUrl}
+            setId={card.set.id}
+            number={card.number}
+            alt={`${card.name} card art`}
+            loading="lazy"
+            fallback={<div className="market-card-image-fallback">No image</div>}
+          />
+        </div>
 
         <div className="market-card-content">
           <div className="market-card-top">
@@ -62,7 +131,11 @@ function MarketCard({ card }: { card: CardListItem }) {
             {card.set.name} ({card.set.id}) · #{card.number}
           </p>
 
-          <Link href={`/cards/${encodeURIComponent(card.cardId)}`} className="market-card-link">
+          <Link
+            href={`/cards/${encodeURIComponent(card.cardId)}`}
+            className="market-card-link"
+            onClick={onViewCard}
+          >
             View card
           </Link>
         </div>
@@ -100,6 +173,8 @@ export default function MarketPage() {
   const [requestErrorMessage, setRequestErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasHydratedState, setHasHydratedState] = useState(false);
+  const pendingScrollRestoreRef = useRef<number | null>(null);
 
   const normalizedInput = useMemo<MarketFilters>(
     () => ({
@@ -108,6 +183,57 @@ export default function MarketPage() {
     }),
     [queryInput, setInput]
   );
+
+  const persistState = useCallback(
+    (scrollY: number = typeof window === 'undefined' ? 0 : window.scrollY) => {
+      writePersistedMarketState({
+        version: MARKET_STATE_VERSION,
+        queryInput,
+        setInput,
+        appliedFilters,
+        cards,
+        cursor,
+        scrollY
+      });
+    },
+    [appliedFilters, cards, cursor, queryInput, setInput]
+  );
+
+  useEffect(() => {
+    const persistedState = readPersistedMarketState();
+    if (persistedState) {
+      setQueryInput(persistedState.queryInput);
+      setSetInput(persistedState.setInput);
+      setAppliedFilters(persistedState.appliedFilters);
+      setCards(persistedState.cards);
+      setCursor(persistedState.cursor);
+      pendingScrollRestoreRef.current = persistedState.scrollY;
+    }
+
+    setHasHydratedState(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasHydratedState) {
+      return;
+    }
+
+    persistState();
+  }, [hasHydratedState, persistState]);
+
+  useEffect(() => {
+    const pendingScrollY = pendingScrollRestoreRef.current;
+    if (pendingScrollY === null) {
+      return;
+    }
+
+    pendingScrollRestoreRef.current = null;
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: pendingScrollY, behavior: 'auto' });
+      });
+    });
+  }, [cards.length]);
 
   const fetchCards = useCallback(
     async (filters: MarketFilters, nextCursor?: string) => {
@@ -175,6 +301,10 @@ export default function MarketPage() {
     event.preventDefault();
     void runSearch(normalizedInput);
   };
+
+  const onViewCard = useCallback(() => {
+    persistState();
+  }, [persistState]);
 
   return (
     <PageContainer>
@@ -253,7 +383,7 @@ export default function MarketPage() {
         <>
           <section className="market-grid" aria-label="Market cards">
             {cards.map((card) => (
-              <MarketCard key={card.cardId} card={card} />
+              <MarketCard key={card.cardId} card={card} onViewCard={onViewCard} />
             ))}
           </section>
 

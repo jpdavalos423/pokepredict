@@ -8,7 +8,9 @@ function createOptions(overrides: Partial<TcgdexProviderOptions> = {}): TcgdexPr
   return {
     baseUrl: 'https://api.tcgdex.net/v2/en',
     listPath: '/cards',
+    setsPath: '/sets',
     detailPathTemplate: '/cards/{id}',
+    excludedSeriesIds: ['tcgp'],
     pageSize: 2,
     maxPages: 0,
     detailConcurrency: 2,
@@ -27,12 +29,52 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
+function isSetsRequest(href: string): boolean {
+  const parsed = new URL(href);
+  return parsed.pathname.endsWith('/sets');
+}
+
+function isSeriesRequest(href: string): boolean {
+  const parsed = new URL(href);
+  return parsed.pathname.includes('/series/');
+}
+
+function defaultSetsResponse(): Response {
+  return jsonResponse(200, [
+    { id: 'sv3', serie: { id: 'sv' } },
+    { id: 'sv2', serie: { id: 'sv' } },
+    { id: 'A1', serie: { id: 'tcgp' } }
+  ]);
+}
+
+function defaultSeriesResponse(): Response {
+  return jsonResponse(200, {
+    id: 'tcgp',
+    sets: [{ id: 'A1' }]
+  });
+}
+
+function defaultScopeResponse(href: string): Response | undefined {
+  if (isSeriesRequest(href)) {
+    return defaultSeriesResponse();
+  }
+  if (isSetsRequest(href)) {
+    return defaultSetsResponse();
+  }
+  return undefined;
+}
+
 describe('tcgdex provider', () => {
   it('paginates list responses and fetches card details', async () => {
     const calls: string[] = [];
     const fetchImpl = vi.fn(async (url: string | URL) => {
       const href = String(url);
       calls.push(href);
+
+      const scopeResponse = defaultScopeResponse(href);
+      if (scopeResponse) {
+        return scopeResponse;
+      }
 
       if (href.includes('/cards?') && href.includes('page=1')) {
         return jsonResponse(200, {
@@ -107,6 +149,10 @@ describe('tcgdex provider', () => {
 
     const fetchImpl = vi.fn(async (url: string | URL) => {
       const href = String(url);
+      const scopeResponse = defaultScopeResponse(href);
+      if (scopeResponse) {
+        return scopeResponse;
+      }
       if (href.includes('/cards?')) {
         return jsonResponse(200, {
           cards: cardIds.map((id) => ({ id })),
@@ -159,6 +205,10 @@ describe('tcgdex provider', () => {
 
     const fetchImpl = vi.fn(async (url: string | URL) => {
       const href = String(url);
+      const scopeResponse = defaultScopeResponse(href);
+      if (scopeResponse) {
+        return scopeResponse;
+      }
       if (href.includes('/cards?')) {
         return jsonResponse(200, {
           cards: [{ id: 'sv3-198' }],
@@ -209,6 +259,10 @@ describe('tcgdex provider', () => {
 
     const fetchImpl = vi.fn(async (url: string | URL) => {
       const href = String(url);
+      const scopeResponse = defaultScopeResponse(href);
+      if (scopeResponse) {
+        return scopeResponse;
+      }
       if (href.includes('/cards?')) {
         return jsonResponse(200, {
           cards: [{ id: 'sv3-198' }, { id: 'missing-card' }],
@@ -253,5 +307,91 @@ describe('tcgdex provider', () => {
     expect(result.metrics.requestFailures).toBe(1);
     expect(result.metrics.retryCount).toBe(0);
     expect(missingCardCalls).toBe(1);
+  });
+
+  it('filters tcgp cards using excluded set metadata and records skip reason', async () => {
+    const fetchImpl = vi.fn(async (url: string | URL) => {
+      const href = String(url);
+      if (isSeriesRequest(href)) {
+        return jsonResponse(200, {
+          id: 'tcgp',
+          sets: [{ id: 'A1' }]
+        });
+      }
+      if (isSetsRequest(href)) {
+        return jsonResponse(200, [{ id: 'sv3', serie: { id: 'sv' } }]);
+      }
+
+      if (href.includes('/cards?')) {
+        return jsonResponse(200, {
+          cards: [{ id: 'A1-001' }, { id: 'sv3-198' }],
+          pagination: { page: 1, hasNextPage: false }
+        });
+      }
+
+      if (href.endsWith('/cards/sv3-198')) {
+        return jsonResponse(200, {
+          id: 'sv3-198',
+          set: { id: 'sv3' },
+          pricing: {
+            tcgplayer: {
+              updated: '2026-03-09T00:00:00.000Z',
+              normal: { marketPrice: 100 }
+            }
+          }
+        });
+      }
+
+      return jsonResponse(404, { message: 'not found' });
+    });
+
+    const provider = new TcgdexPriceSourceProvider(createOptions(), {
+      fetchImpl,
+      sleep: async () => {},
+      random: () => 0
+    });
+
+    const result = await provider.fetch({
+      runId: 'run_scope_filter',
+      asOf: '2026-03-10T06:00:00.000Z',
+      source: 'tcgdex',
+      mode: 'manual',
+      startedAt: '2026-03-10T06:00:00.000Z'
+    });
+
+    expect(result.records).toHaveLength(1);
+    expect(result.records[0]?.sourceCardId).toBe('sv3-198');
+    expect(result.metrics.totalCardsScanned).toBe(2);
+    expect(result.metrics.skipReasonCounts['excluded out-of-scope set']).toBe(1);
+    expect(result.metrics.cardsWithDetailFetched).toBe(1);
+  });
+
+  it('fails closed when excluded series set lookup does not resolve', async () => {
+    const fetchImpl = vi.fn(async (url: string | URL) => {
+      const href = String(url);
+      if (isSeriesRequest(href)) {
+        return jsonResponse(500, { message: 'series lookup failed' });
+      }
+      if (isSetsRequest(href)) {
+        return jsonResponse(200, [{ id: 'sv3', serie: { id: 'sv' } }]);
+      }
+      return jsonResponse(500, { message: 'unexpected request' });
+    });
+
+    const provider = new TcgdexPriceSourceProvider(createOptions(), {
+      fetchImpl,
+      sleep: async () => {},
+      random: () => 0
+    });
+
+    await expect(
+      provider.fetch({
+        runId: 'run_scope_fail_closed',
+        asOf: '2026-03-10T06:00:00.000Z',
+        source: 'tcgdex',
+        mode: 'manual',
+        startedAt: '2026-03-10T06:00:00.000Z'
+      })
+    ).rejects.toThrow(/Failed to resolve TCGdex excluded set IDs/);
   });
 });

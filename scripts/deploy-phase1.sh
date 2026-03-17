@@ -7,11 +7,40 @@ cd "$ROOT_DIR"
 STACK_NAME="${STACK_NAME:-pokepredict-dev-stack}"
 PIPELINE_SOURCE="${SOURCE_NAME:-tcgdex}"
 SEED_SOURCE="${SEED_SOURCE:-$PIPELINE_SOURCE}"
+RUN_SEED="false"
 RUN_PIPELINE="false"
 
-if [[ "${1:-}" == "--run" ]]; then
-  RUN_PIPELINE="true"
-fi
+print_usage() {
+  cat <<'USAGE'
+Usage: bash scripts/deploy-phase1.sh [--seed] [--run]
+
+Options:
+  --seed   Seed cards after deploy.
+  --run    Trigger one manual ingestion execution after deploy.
+  --help   Show this help text.
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --seed)
+      RUN_SEED="true"
+      ;;
+    --run)
+      RUN_PIPELINE="true"
+      ;;
+    --help|-h)
+      print_usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      print_usage >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
 
 echo "[phase1] Building shared + pipeline"
 pnpm --filter @pokepredict/shared build
@@ -30,8 +59,12 @@ if [[ "$SEED_SOURCE" == "tcgdex" ]]; then
   SEED_COMMAND="generate:data:tcgdex"
 fi
 
-echo "[phase1] Seeding cards into $TABLE_CARDS using source=$SEED_SOURCE ($SEED_COMMAND)"
-TABLE_CARDS="$TABLE_CARDS" pnpm "$SEED_COMMAND"
+if [[ "$RUN_SEED" == "true" ]]; then
+  echo "[phase1] Seeding cards into $TABLE_CARDS using source=$SEED_SOURCE ($SEED_COMMAND)"
+  TABLE_CARDS="$TABLE_CARDS" pnpm "$SEED_COMMAND"
+else
+  echo "[phase1] Skipping seed (pass --seed to enable)"
+fi
 
 cat > .phase1.env <<ENVFILE
 TABLE_CARDS=$TABLE_CARDS

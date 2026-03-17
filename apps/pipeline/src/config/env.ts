@@ -7,7 +7,9 @@ export interface PipelineConfig {
   tcgdex: {
     baseUrl: string;
     listPath: string;
+    setsPath: string;
     detailPathTemplate: string;
+    excludedSeriesIds: string[];
     pageSize: number;
     maxPages: number;
     detailConcurrency: number;
@@ -24,6 +26,14 @@ export interface PipelineConfig {
     alertsByUser: string;
     alertsByCard: string;
   };
+}
+
+function readCsvOrDefault(name: string, fallback: string): string[] {
+  const rawValue = process.env[name] ?? fallback;
+  return rawValue
+    .split(',')
+    .map((token) => token.trim().toLowerCase())
+    .filter((token, index, array) => token.length > 0 && array.indexOf(token) === index);
 }
 
 function required(name: string): string {
@@ -80,7 +90,9 @@ export function loadPipelineConfig(): PipelineConfig {
     tcgdex: {
       baseUrl: readOrDefault('TCGDEX_BASE_URL', 'https://api.tcgdex.net/v2/en'),
       listPath: readOrDefault('TCGDEX_LIST_PATH', '/cards'),
+      setsPath: readOrDefault('TCGDEX_SETS_PATH', '/sets'),
       detailPathTemplate: readOrDefault('TCGDEX_DETAIL_PATH_TEMPLATE', '/cards/{id}'),
+      excludedSeriesIds: readCsvOrDefault('TCGDEX_EXCLUDED_SERIES_IDS', 'tcgp'),
       pageSize: atLeast(readIntOrDefault('TCGDEX_PAGE_SIZE', 100), 1),
       maxPages: atLeast(readIntOrDefault('TCGDEX_MAX_PAGES', 0), 0),
       detailConcurrency: atLeast(readIntOrDefault('TCGDEX_DETAIL_CONCURRENCY', 8), 1),

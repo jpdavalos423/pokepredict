@@ -60,6 +60,31 @@ function centsToUsdDecimal(cents: number): number {
   return cents / 100;
 }
 
+export function normalizeCardRarity(
+  rarityValue: string | undefined,
+  setName: string | undefined
+): string | undefined {
+  if (typeof rarityValue !== 'string') {
+    return undefined;
+  }
+
+  const trimmedRarity = rarityValue.trim();
+  if (!trimmedRarity) {
+    return undefined;
+  }
+
+  if (trimmedRarity.toLowerCase() !== 'none') {
+    return trimmedRarity;
+  }
+
+  const normalizedSetName = typeof setName === 'string' ? setName.trim().toLowerCase() : '';
+  if (normalizedSetName.includes('promo')) {
+    return 'Promo';
+  }
+
+  return undefined;
+}
+
 function toCardListItem(item: Record<string, unknown>): CardListItem {
   const card: CardListItem = {
     cardId: asString(item.cardId, 'cardId'),
@@ -71,8 +96,12 @@ function toCardListItem(item: Record<string, unknown>): CardListItem {
     number: asString(item.number, 'number')
   };
 
-  if (typeof item.rarity === 'string') {
-    card.rarity = item.rarity;
+  const rarity = normalizeCardRarity(
+    typeof item.rarity === 'string' ? item.rarity : undefined,
+    card.set.name
+  );
+  if (rarity) {
+    card.rarity = rarity;
   }
 
   if (typeof item.imageUrl === 'string') {
@@ -93,8 +122,12 @@ function toCardDetail(item: Record<string, unknown>): CardDetail {
     number: asString(item.number, 'number')
   };
 
-  if (typeof item.rarity === 'string') {
-    card.rarity = item.rarity;
+  const rarity = normalizeCardRarity(
+    typeof item.rarity === 'string' ? item.rarity : undefined,
+    card.set.name
+  );
+  if (rarity) {
+    card.rarity = rarity;
   }
 
   if (typeof item.imageUrl === 'string') {

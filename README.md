@@ -34,13 +34,28 @@ To seed cards from TCGdex (recommended for Phase 2.5+):
 pnpm generate:data:tcgdex
 ```
 Requires `TABLE_CARDS` and `AWS_REGION`; optional TCGdex knobs are in `.env.example`.
+`TCGDEX_EXCLUDED_SERIES_IDS` defaults to `tcgp` to keep Pokémon TCG Pocket cards out of scope.
+
+To purge already-ingested Pokémon TCG Pocket cards and dependent records:
+```bash
+pnpm purge:tcgp:dry-run
+pnpm purge:tcgp:execute
+```
 
 ## Phase 1 Fast Deploy
 ```bash
 pnpm deploy:phase1
 ```
-This builds pipeline artifacts, vendors runtime deps, deploys CDK, seeds cards, and triggers one manual ingestion run.
-`deploy:phase1` is a legacy command name. For Phase 2.5+, it defaults to `SOURCE_NAME=tcgdex` and seeds cards with `generate:data:tcgdex`.
+This builds pipeline artifacts and deploys CDK only (fast path).
+By default it does not seed cards or run ingestion.
+
+To include optional steps:
+```bash
+pnpm deploy:phase1:seed   # deploy + seed cards
+pnpm deploy:phase1:run    # deploy + manual ingestion run
+pnpm deploy:phase1:full   # deploy + seed + manual run
+```
+For Phase 2.5+, `SOURCE_NAME` defaults to `tcgdex`; `SEED_SOURCE` also defaults to `tcgdex`.
 
 Use overrides only when intentionally validating fixture mode:
 ```bash

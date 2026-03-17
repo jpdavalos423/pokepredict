@@ -9,6 +9,15 @@ import {
   type TcgdexCardIdentityInput,
   translateTcgdexCardId
 } from './tcgdex-id';
+import {
+  extractTcgdexSetIdsFromSeriesPayload,
+  extractTcgdexSetSummaries,
+  extractSetIdFromCardId,
+  isExcludedSetId,
+  parseTcgdexPagination,
+  type TcgdexSetSummary,
+  resolveExcludedSetIdsFromPayload
+} from './tcgdex-scope';
 
 export const TCGDEX_SKIP_REASONS = [
   'missing pricing',
@@ -16,7 +25,8 @@ export const TCGDEX_SKIP_REASONS = [
   'missing normal variant',
   'missing marketPrice',
   'invalid timestamp',
-  'unknown card ID'
+  'unknown card ID',
+  'excluded out-of-scope set'
 ] as const;
 
 export type TcgdexSkipReason = (typeof TCGDEX_SKIP_REASONS)[number];
@@ -43,7 +53,9 @@ export interface TcgdexMapResult {
 export interface TcgdexProviderOptions {
   baseUrl: string;
   listPath: string;
+  setsPath: string;
   detailPathTemplate: string;
+  excludedSeriesIds: string[];
   pageSize: number;
   maxPages: number;
   detailConcurrency: number;
@@ -66,6 +78,16 @@ interface ListPageResult {
   nextPage?: number;
 }
 
+interface CardIdSelectionResult {
+  cardIds: string[];
+  totalCardsScanned: number;
+}
+
+const TCGDEX_SETS_PAGE_SIZE = 250;
+const TCGDEX_SETS_MAX_PAGES = 100;
+const TCGDEX_SET_DETAIL_CONCURRENCY = 10;
+const TCGDEX_SERIES_DETAIL_CONCURRENCY = 4;
+
 class HttpStatusError extends Error {
   readonly status: number;
 
@@ -85,6 +107,13 @@ function toNumber(value: unknown): number | undefined {
 
 function incrementCounter(record: Record<string, number>, key: string): void {
   record[key] = (record[key] ?? 0) + 1;
+}
+
+function hasSeriesMetadata(setSummary: TcgdexSetSummary): boolean {
+  return (
+    typeof setSummary.serie?.id === 'string' ||
+    typeof setSummary.series?.id === 'string'
+  );
 }
 
 export { normalizeTcgdexCardId, translateTcgdexCardId } from './tcgdex-id';
@@ -274,12 +303,19 @@ async function runWithConcurrency<T>(
 }
 
 export class TcgdexPriceSourceProvider implements PriceSourceProvider {
+  private readonly options: TcgdexProviderOptions;
   private readonly deps: TcgdexProviderDependencies;
 
   constructor(
-    private readonly options: TcgdexProviderOptions,
+    options: TcgdexProviderOptions,
     deps?: Partial<TcgdexProviderDependencies>
   ) {
+    this.options = {
+      ...options,
+      excludedSeriesIds: [...new Set(options.excludedSeriesIds
+        .map((seriesId) => seriesId.trim().toLowerCase())
+        .filter((seriesId) => seriesId.length > 0))]
+    };
     this.deps = {
       fetchImpl: deps?.fetchImpl ?? fetch,
       sleep: deps?.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms))),
@@ -302,8 +338,10 @@ export class TcgdexPriceSourceProvider implements PriceSourceProvider {
       runDurationMs: 0
     };
 
-    const cardIds = await this.fetchAllCardIds(metrics);
-    metrics.totalCardsScanned = cardIds.length;
+    const excludedSetIds = await this.resolveExcludedSetIds(metrics);
+    const selection = await this.fetchAllCardIds(excludedSetIds, metrics);
+    const cardIds = selection.cardIds;
+    metrics.totalCardsScanned = selection.totalCardsScanned;
 
     const records: RawPriceRecord[] = [];
 
@@ -311,6 +349,16 @@ export class TcgdexPriceSourceProvider implements PriceSourceProvider {
       try {
         const detail = await this.fetchCardDetail(cardId, metrics);
         metrics.cardsWithDetailFetched += 1;
+
+        const detailSetId =
+          typeof detail.set?.id === 'string' && detail.set.id.length > 0
+            ? detail.set.id
+            : extractSetIdFromCardId(cardId);
+        if (isExcludedSetId(detailSetId, excludedSetIds)) {
+          metrics.cardsSkipped += 1;
+          incrementCounter(metrics.skipReasonCounts, 'excluded out-of-scope set');
+          return;
+        }
 
         const mapped = mapTcgdexCardToRawRecord(detail, context.asOf);
         if (mapped.skipReason) {
@@ -359,8 +407,177 @@ export class TcgdexPriceSourceProvider implements PriceSourceProvider {
     };
   }
 
-  private async fetchAllCardIds(metrics: PriceSourceFetchMetrics): Promise<string[]> {
+  private async resolveExcludedSetIds(metrics: PriceSourceFetchMetrics): Promise<Set<string>> {
+    if (this.options.excludedSeriesIds.length === 0) {
+      return new Set<string>();
+    }
+
+    const seriesResolved = await this.resolveExcludedSetIdsFromSeriesEndpoints(metrics);
+    const excludedSetIds = new Set<string>(seriesResolved.excludedSetIds);
+    let unmatchedSeries = this.options.excludedSeriesIds.filter(
+      (seriesId) => !seriesResolved.matchedSeriesIds.has(seriesId)
+    );
+    if (unmatchedSeries.length === 0) {
+      return excludedSetIds;
+    }
+
+    let allSets = await this.fetchAllSets(metrics);
+    let resolved = resolveExcludedSetIdsFromPayload(allSets, unmatchedSeries);
+    if (resolved.totalSetsParsed === 0) {
+      throw new Error('Failed to resolve TCGdex excluded set IDs: /sets payload contained no set entries.');
+    }
+
+    unmatchedSeries = unmatchedSeries.filter((seriesId) => !resolved.matchedSeriesIds.has(seriesId));
+
+    if (unmatchedSeries.length > 0 && allSets.some((setSummary) => !hasSeriesMetadata(setSummary))) {
+      allSets = await this.hydrateSetSeriesMetadata(allSets, metrics);
+      resolved = resolveExcludedSetIdsFromPayload(allSets, unmatchedSeries);
+      unmatchedSeries = unmatchedSeries.filter((seriesId) => !resolved.matchedSeriesIds.has(seriesId));
+    }
+
+    if (unmatchedSeries.length > 0) {
+      throw new Error(
+        `Failed to resolve TCGdex excluded set IDs: no sets found for excluded series ${unmatchedSeries.join(', ')}.`
+      );
+    }
+
+    for (const setId of resolved.excludedSetIds) {
+      excludedSetIds.add(setId);
+    }
+
+    return excludedSetIds;
+  }
+
+  private async resolveExcludedSetIdsFromSeriesEndpoints(
+    metrics: PriceSourceFetchMetrics
+  ): Promise<{ excludedSetIds: Set<string>; matchedSeriesIds: Set<string> }> {
+    const excludedSetIds = new Set<string>();
+    const matchedSeriesIds = new Set<string>();
+
+    await runWithConcurrency(
+      this.options.excludedSeriesIds,
+      TCGDEX_SERIES_DETAIL_CONCURRENCY,
+      async (seriesId) => {
+        let payload: unknown;
+        try {
+          payload = await this.requestJson(this.buildSeriesDetailUrl(seriesId), metrics);
+        } catch {
+          metrics.requestFailures += 1;
+          return;
+        }
+
+        const setIds = extractTcgdexSetIdsFromSeriesPayload(payload);
+        if (setIds.size === 0) {
+          return;
+        }
+
+        matchedSeriesIds.add(seriesId);
+        for (const setId of setIds) {
+          excludedSetIds.add(setId);
+        }
+      }
+    );
+
+    return {
+      excludedSetIds,
+      matchedSeriesIds
+    };
+  }
+
+  private async fetchAllSets(metrics: PriceSourceFetchMetrics): Promise<TcgdexSetSummary[]> {
+    const setsById = new Map<string, TcgdexSetSummary>();
+    let page = 1;
+    let pagesFetched = 0;
+    let hasNextPage = true;
+
+    while (hasNextPage && pagesFetched < TCGDEX_SETS_MAX_PAGES) {
+      const setsUrl = this.buildSetsUrl(page);
+      let payload: unknown;
+
+      try {
+        payload = await this.requestJson(setsUrl, metrics);
+      } catch (error) {
+        metrics.requestFailures += 1;
+        throw new Error(
+          `Failed to resolve TCGdex excluded set IDs: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+
+      const summaries = extractTcgdexSetSummaries(payload);
+      const beforeCount = setsById.size;
+      for (const summary of summaries) {
+        if (typeof summary.id !== 'string' || summary.id.trim().length === 0) {
+          continue;
+        }
+        setsById.set(summary.id.trim().toLowerCase(), summary);
+      }
+
+      const pagination = parseTcgdexPagination(payload, page, summaries.length);
+      hasNextPage = pagination.hasNextPage;
+
+      if (setsById.size === beforeCount && !pagination.nextPage) {
+        // Protect against providers that ignore pagination params and keep returning the same page.
+        hasNextPage = false;
+      }
+
+      const nextPage = pagination.nextPage ?? page + 1;
+      if (nextPage <= page) {
+        hasNextPage = false;
+      } else {
+        page = nextPage;
+      }
+
+      pagesFetched += 1;
+    }
+
+    return [...setsById.values()];
+  }
+
+  private async hydrateSetSeriesMetadata(
+    summaries: TcgdexSetSummary[],
+    metrics: PriceSourceFetchMetrics
+  ): Promise<TcgdexSetSummary[]> {
+    const hydrated = [...summaries];
+
+    await runWithConcurrency(
+      hydrated,
+      TCGDEX_SET_DETAIL_CONCURRENCY,
+      async (summary, index) => {
+        if (typeof summary.id !== 'string' || summary.id.trim().length === 0 || hasSeriesMetadata(summary)) {
+          return;
+        }
+
+        const setId = summary.id;
+        let payload: unknown;
+        try {
+          payload = await this.requestJson(this.buildSetDetailUrl(setId), metrics);
+        } catch (error) {
+          metrics.requestFailures += 1;
+          throw new Error(
+            `Failed to resolve TCGdex set detail for ${setId}: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+
+        if (typeof payload === 'object' && payload !== null) {
+          const detail = payload as TcgdexSetSummary;
+          hydrated[index] = {
+            ...summary,
+            ...detail,
+            id: typeof detail.id === 'string' && detail.id.trim().length > 0 ? detail.id : summary.id
+          };
+        }
+      }
+    );
+
+    return hydrated;
+  }
+
+  private async fetchAllCardIds(
+    excludedSetIds: ReadonlySet<string>,
+    metrics: PriceSourceFetchMetrics
+  ): Promise<CardIdSelectionResult> {
     const collected = new Set<string>();
+    let totalCardsScanned = 0;
     let page = 1;
     let pagesFetched = 0;
     let hasNextPage = true;
@@ -383,9 +600,21 @@ export class TcgdexPriceSourceProvider implements PriceSourceProvider {
 
       const parsedPage = parseListPage(payload, this.options.pageSize, page);
       for (const id of parsedPage.ids) {
-        if (id.trim().length > 0) {
-          collected.add(id.trim());
+        const trimmed = id.trim();
+        if (trimmed.length === 0) {
+          continue;
         }
+
+        totalCardsScanned += 1;
+
+        const setIdFromCardId = extractSetIdFromCardId(trimmed);
+        if (isExcludedSetId(setIdFromCardId, excludedSetIds)) {
+          metrics.cardsSkipped += 1;
+          incrementCounter(metrics.skipReasonCounts, 'excluded out-of-scope set');
+          continue;
+        }
+
+        collected.add(trimmed);
       }
 
       hasNextPage = parsedPage.hasNextPage;
@@ -393,7 +622,10 @@ export class TcgdexPriceSourceProvider implements PriceSourceProvider {
       pagesFetched += 1;
     }
 
-    return [...collected];
+    return {
+      cardIds: [...collected],
+      totalCardsScanned
+    };
   }
 
   private buildListUrl(page: number): URL {
@@ -403,6 +635,24 @@ export class TcgdexPriceSourceProvider implements PriceSourceProvider {
     url.searchParams.set('pagination:page', pageValue);
     url.searchParams.set('pagination:itemsPerPage', pageSizeValue);
     return url;
+  }
+
+  private buildSetsUrl(page: number): URL {
+    const url = this.buildApiUrl(this.options.setsPath);
+    url.searchParams.set('pagination:page', String(page));
+    url.searchParams.set('pagination:itemsPerPage', String(TCGDEX_SETS_PAGE_SIZE));
+    return url;
+  }
+
+  private buildSetDetailUrl(setId: string): URL {
+    const setsPath = this.options.setsPath.endsWith('/')
+      ? this.options.setsPath.slice(0, -1)
+      : this.options.setsPath;
+    return this.buildApiUrl(`${setsPath}/${encodeURIComponent(setId)}`);
+  }
+
+  private buildSeriesDetailUrl(seriesId: string): URL {
+    return this.buildApiUrl(`/series/${encodeURIComponent(seriesId)}`);
   }
 
   private buildDetailUrl(cardId: string): URL {

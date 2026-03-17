@@ -14,3 +14,5 @@ cdk.out/
 .phase1.env
 *.tsbuildinfo
 .DS_Store
+docs/reports/*
+!docs/reports/.gitkeep

@@ -13,7 +13,9 @@ export interface CdkEnvConfig {
   tcgdex: {
     baseUrl: string;
     listPath: string;
+    setsPath: string;
     detailPathTemplate: string;
+    excludedSeriesIds: string;
     pageSize: number;
     maxPages: number;
     detailConcurrency: number;
@@ -56,13 +58,15 @@ export function loadCdkEnvConfig(): CdkEnvConfig {
       `/pokepredict/${stage}/cursor-signing-secret`
     ),
     sesFromEmail: readOrDefault('SES_FROM_EMAIL', `alerts+${stage}@pokepredict.dev`),
-    fetchRawTimeoutSeconds: readIntOrDefault('FETCH_RAW_TIMEOUT_SECONDS', 300),
+    fetchRawTimeoutSeconds: readIntOrDefault('FETCH_RAW_TIMEOUT_SECONDS', 900),
     normalizeTimeoutSeconds: readIntOrDefault('NORMALIZE_TIMEOUT_SECONDS', 300),
     stateMachineTimeoutMinutes: readIntOrDefault('STATE_MACHINE_TIMEOUT_MINUTES', 30),
     tcgdex: {
       baseUrl: readOrDefault('TCGDEX_BASE_URL', 'https://api.tcgdex.net/v2/en'),
       listPath: readOrDefault('TCGDEX_LIST_PATH', '/cards'),
+      setsPath: readOrDefault('TCGDEX_SETS_PATH', '/sets'),
       detailPathTemplate: readOrDefault('TCGDEX_DETAIL_PATH_TEMPLATE', '/cards/{id}'),
+      excludedSeriesIds: readOrDefault('TCGDEX_EXCLUDED_SERIES_IDS', 'tcgp'),
       pageSize: readIntOrDefault('TCGDEX_PAGE_SIZE', 100),
       maxPages: readIntOrDefault('TCGDEX_MAX_PAGES', 0),
       detailConcurrency: readIntOrDefault('TCGDEX_DETAIL_CONCURRENCY', 8),

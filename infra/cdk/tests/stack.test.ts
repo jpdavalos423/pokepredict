@@ -14,13 +14,15 @@ describe('Phase 5 stack', () => {
       cursorSigningSecretParam: '/pokepredict/dev/cursor-signing-secret',
       cursorSigningSecretVersion: 1,
       sesFromEmail: 'alerts+dev@pokepredict.dev',
-      fetchRawTimeoutSeconds: 300,
+      fetchRawTimeoutSeconds: 900,
       normalizeTimeoutSeconds: 300,
       stateMachineTimeoutMinutes: 30,
       tcgdex: {
         baseUrl: 'https://api.tcgdex.net/v2/en',
         listPath: '/cards',
+        setsPath: '/sets',
         detailPathTemplate: '/cards/{id}',
+        excludedSeriesIds: 'tcgp',
         pageSize: 100,
         maxPages: 0,
         detailConcurrency: 8,
@@ -57,11 +59,12 @@ describe('Phase 5 stack', () => {
     });
 
     template.hasResourceProperties('AWS::Lambda::Function', {
-      Timeout: 300,
+      Timeout: 900,
       Environment: {
         Variables: Match.objectLike({
           TCGDEX_BASE_URL: 'https://api.tcgdex.net/v2/en',
-          TCGDEX_DETAIL_CONCURRENCY: '8'
+          TCGDEX_DETAIL_CONCURRENCY: '8',
+          TCGDEX_EXCLUDED_SERIES_IDS: 'tcgp'
         })
       }
     });

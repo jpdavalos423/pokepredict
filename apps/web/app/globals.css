@@ -367,6 +367,12 @@ h2 {
   transform: translateY(-1px);
 }
 
+.ui-button:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .ui-button:focus-visible,
 .ui-input:focus-visible {
   outline: none;
@@ -584,9 +590,9 @@ h2 {
 }
 
 .market-card-image-fallback {
-  width: 80px;
-  height: 110px;
-  border-radius: 10px;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
   border: 1px dashed var(--border-subtle);
   color: var(--text-muted);
   font-size: 0.74rem;
@@ -607,8 +613,9 @@ h2 {
 
 .market-card-top {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--space-2);
 }
 
@@ -616,6 +623,14 @@ h2 {
   margin: 0;
   font-size: 0.97rem;
   line-height: 1.3;
+  flex: 1 1 9.5rem;
+  min-width: 0;
+}
+
+.market-card-top .ui-badge {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .market-card-meta {
@@ -789,6 +804,161 @@ h2 {
   font-size: 0.88rem;
 }
 
+.crud-grid {
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.crud-grid-two {
+  align-items: start;
+}
+
+.crud-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.crud-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.crud-form-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.crud-field {
+  display: grid;
+  gap: 6px;
+}
+
+.crud-field-label {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.crud-field-span-full {
+  grid-column: 1 / -1;
+}
+
+.crud-textarea {
+  min-height: 82px;
+  resize: vertical;
+}
+
+.crud-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.crud-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.crud-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.crud-row {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-input);
+  padding: var(--space-4);
+  background: rgba(255, 255, 255, 0.02);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.crud-row-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.crud-row-title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.crud-row-subtitle {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 0.79rem;
+  text-transform: capitalize;
+}
+
+.crud-row-value-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.crud-row-value {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.crud-row-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.crud-row-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.crud-confirm-actions {
+  display: inline-flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.crud-empty {
+  padding: var(--space-6) var(--space-4);
+}
+
+.crud-feedback {
+  padding: var(--space-3) var(--space-4);
+}
+
+.crud-feedback-success {
+  border-color: rgba(52, 199, 123, 0.35);
+  background: rgba(52, 199, 123, 0.12);
+}
+
+.crud-feedback-copy {
+  margin: 0;
+  color: #92e5b6;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
 @media (min-width: 640px) {
   .phase-grid-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -803,6 +973,10 @@ h2 {
   }
 
   .dashboard-secondary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .crud-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -828,6 +1002,10 @@ h2 {
 
   .card-detail-secondary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .crud-grid-two {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 
@@ -890,5 +1068,15 @@ h2 {
   .card-detail-thumb {
     width: 72px;
     height: 100px;
+  }
+
+  .crud-row-main,
+  .crud-row-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .crud-row-value-wrap {
+    justify-content: flex-start;
   }
 }

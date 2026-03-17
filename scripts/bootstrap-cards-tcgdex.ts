@@ -1,9 +1,19 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { BatchWriteCommand, DynamoDBDocumentClient, type WriteRequest } from '@aws-sdk/lib-dynamodb';
+import { BatchWriteCommand, DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import {
   translateTcgdexCardId,
   type TcgdexCardIdentityInput
 } from '../apps/pipeline/src/providers/tcgdex-id';
+import {
+  extractTcgdexSetIdsFromSeriesPayload,
+  extractTcgdexSetSummaries,
+  extractSetIdFromCardId,
+  isExcludedSetId,
+  parseCsvList,
+  parseTcgdexPagination,
+  type TcgdexSetSummary,
+  resolveExcludedSetIdsFromPayload
+} from '../apps/pipeline/src/providers/tcgdex-scope';
 
 interface SeedCard {
   cardId: string;
@@ -16,17 +26,31 @@ interface SeedCard {
 }
 
 interface TcgdexCardDetail extends TcgdexCardIdentityInput {
+  set?: { id?: string; name?: string };
   name?: string;
   rarity?: string | { name?: string };
   image?: string | Record<string, unknown>;
 }
+
+interface SeedWriteRequest {
+  PutRequest: {
+    Item: Record<string, unknown>;
+  };
+}
+
+const TCGDEX_SETS_PAGE_SIZE = 250;
+const TCGDEX_SETS_MAX_PAGES = 100;
+const TCGDEX_SET_DETAIL_CONCURRENCY = 10;
+const TCGDEX_SERIES_DETAIL_CONCURRENCY = 4;
 
 interface SeedConfig {
   region: string;
   tableName: string;
   baseUrl: string;
   listPath: string;
+  setsPath: string;
   detailPathTemplate: string;
+  excludedSeriesIds: string[];
   pageSize: number;
   maxPages: number;
   detailConcurrency: number;
@@ -41,6 +65,7 @@ interface SeedMetrics {
   totalCardsScanned: number;
   detailFetched: number;
   mapped: number;
+  excludedByScope: number;
   skipped: number;
   skipReasonCounts: Record<string, number>;
   requestFailures: number;
@@ -85,12 +110,15 @@ function atLeast(value: number, minimum: number): number {
 }
 
 function buildConfig(): SeedConfig {
+  const excludedSeriesIds = parseCsvList(process.env.TCGDEX_EXCLUDED_SERIES_IDS ?? 'tcgp');
   return {
     region: process.env.AWS_REGION ?? 'us-west-2',
     tableName: required('TABLE_CARDS'),
     baseUrl: process.env.TCGDEX_BASE_URL ?? 'https://api.tcgdex.net/v2/en',
     listPath: process.env.TCGDEX_LIST_PATH ?? '/cards',
+    setsPath: process.env.TCGDEX_SETS_PATH ?? '/sets',
     detailPathTemplate: process.env.TCGDEX_DETAIL_PATH_TEMPLATE ?? '/cards/{id}',
+    excludedSeriesIds,
     pageSize: atLeast(readIntOrDefault('TCGDEX_PAGE_SIZE', 100), 1),
     maxPages: atLeast(readIntOrDefault('TCGDEX_MAX_PAGES', 0), 0),
     detailConcurrency: atLeast(readIntOrDefault('TCGDEX_DETAIL_CONCURRENCY', 10), 1),
@@ -193,6 +221,23 @@ function buildDetailUrl(config: SeedConfig, sourceCardId: string): URL {
   return buildApiUrl(config.baseUrl, path);
 }
 
+function buildSetsUrl(config: SeedConfig): URL {
+  return buildApiUrl(config.baseUrl, config.setsPath);
+}
+
+function buildSetDetailUrl(config: SeedConfig, setId: string): URL {
+  const setsPath = config.setsPath.endsWith('/') ? config.setsPath.slice(0, -1) : config.setsPath;
+  return buildApiUrl(config.baseUrl, `${setsPath}/${encodeURIComponent(setId)}`);
+}
+
+function buildSeriesDetailUrl(config: SeedConfig, seriesId: string): URL {
+  return buildApiUrl(config.baseUrl, `/series/${encodeURIComponent(seriesId)}`);
+}
+
+function hasSeriesMetadata(setSummary: TcgdexSetSummary): boolean {
+  return typeof setSummary.serie?.id === 'string' || typeof setSummary.series?.id === 'string';
+}
+
 function isRetriableStatus(status: number): boolean {
   if (status === 408 || status === 429) {
     return true;
@@ -245,7 +290,172 @@ async function requestJson(url: URL, config: SeedConfig, metrics: SeedMetrics): 
   throw new Error(`Request exhausted retries for ${url.toString()}`);
 }
 
-async function fetchAllCardIds(config: SeedConfig, metrics: SeedMetrics): Promise<string[]> {
+async function resolveExcludedSetIds(config: SeedConfig, metrics: SeedMetrics): Promise<Set<string>> {
+  if (config.excludedSeriesIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const seriesResolved = await resolveExcludedSetIdsFromSeriesEndpoints(config, metrics);
+  const excludedSetIds = new Set<string>(seriesResolved.excludedSetIds);
+  let unmatchedSeries = config.excludedSeriesIds.filter(
+    (seriesId) => !seriesResolved.matchedSeriesIds.has(seriesId)
+  );
+  if (unmatchedSeries.length === 0) {
+    return excludedSetIds;
+  }
+
+  let setSummaries = await fetchAllSets(config, metrics);
+  let resolved = resolveExcludedSetIdsFromPayload(setSummaries, unmatchedSeries);
+  if (resolved.totalSetsParsed === 0) {
+    throw new Error('Failed to resolve excluded TCGdex sets: /sets payload contained no set entries.');
+  }
+
+  unmatchedSeries = unmatchedSeries.filter((seriesId) => !resolved.matchedSeriesIds.has(seriesId));
+  if (unmatchedSeries.length > 0 && setSummaries.some((summary) => !hasSeriesMetadata(summary))) {
+    setSummaries = await hydrateSetSeriesMetadata(config, metrics, setSummaries);
+    resolved = resolveExcludedSetIdsFromPayload(setSummaries, unmatchedSeries);
+    unmatchedSeries = unmatchedSeries.filter((seriesId) => !resolved.matchedSeriesIds.has(seriesId));
+  }
+
+  if (unmatchedSeries.length > 0) {
+    throw new Error(
+      `Failed to resolve excluded TCGdex sets: no sets found for excluded series ${unmatchedSeries.join(', ')}.`
+    );
+  }
+
+  for (const setId of resolved.excludedSetIds) {
+    excludedSetIds.add(setId);
+  }
+
+  return excludedSetIds;
+}
+
+async function resolveExcludedSetIdsFromSeriesEndpoints(
+  config: SeedConfig,
+  metrics: SeedMetrics
+): Promise<{ excludedSetIds: Set<string>; matchedSeriesIds: Set<string> }> {
+  const excludedSetIds = new Set<string>();
+  const matchedSeriesIds = new Set<string>();
+
+  await runWithConcurrency(config.excludedSeriesIds, TCGDEX_SERIES_DETAIL_CONCURRENCY, async (seriesId) => {
+    let payload: unknown;
+    try {
+      payload = await requestJson(buildSeriesDetailUrl(config, seriesId), config, metrics);
+    } catch (error) {
+      metrics.requestFailures += 1;
+      return;
+    }
+
+    const setIds = extractTcgdexSetIdsFromSeriesPayload(payload);
+    if (setIds.size === 0) {
+      return;
+    }
+
+    matchedSeriesIds.add(seriesId);
+    for (const setId of setIds) {
+      excludedSetIds.add(setId);
+    }
+  });
+
+  return {
+    excludedSetIds,
+    matchedSeriesIds
+  };
+}
+
+async function fetchAllSets(config: SeedConfig, metrics: SeedMetrics): Promise<TcgdexSetSummary[]> {
+  const setsById = new Map<string, TcgdexSetSummary>();
+  let page = 1;
+  let pagesFetched = 0;
+  let hasNextPage = true;
+
+  while (hasNextPage && pagesFetched < TCGDEX_SETS_MAX_PAGES) {
+    const setsUrl = buildSetsUrl(config);
+    setsUrl.searchParams.set('pagination:page', String(page));
+    setsUrl.searchParams.set('pagination:itemsPerPage', String(TCGDEX_SETS_PAGE_SIZE));
+
+    let payload: unknown;
+    try {
+      payload = await requestJson(setsUrl, config, metrics);
+    } catch (error) {
+      metrics.requestFailures += 1;
+      throw new Error(
+        `Failed to resolve excluded TCGdex sets: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    const summaries = extractTcgdexSetSummaries(payload);
+    const beforeCount = setsById.size;
+    for (const summary of summaries) {
+      if (typeof summary.id !== 'string' || summary.id.trim().length === 0) {
+        continue;
+      }
+      setsById.set(summary.id.trim().toLowerCase(), summary);
+    }
+
+    const pagination = parseTcgdexPagination(payload, page, summaries.length);
+    hasNextPage = pagination.hasNextPage;
+
+    if (setsById.size === beforeCount && !pagination.nextPage) {
+      hasNextPage = false;
+    }
+
+    const nextPage = pagination.nextPage ?? page + 1;
+    if (nextPage <= page) {
+      hasNextPage = false;
+    } else {
+      page = nextPage;
+    }
+
+    pagesFetched += 1;
+  }
+
+  return [...setsById.values()];
+}
+
+async function hydrateSetSeriesMetadata(
+  config: SeedConfig,
+  metrics: SeedMetrics,
+  summaries: TcgdexSetSummary[]
+): Promise<TcgdexSetSummary[]> {
+  const hydrated = [...summaries];
+
+  await runWithConcurrency(hydrated, TCGDEX_SET_DETAIL_CONCURRENCY, async (summary, index) => {
+    if (typeof summary.id !== 'string' || summary.id.trim().length === 0 || hasSeriesMetadata(summary)) {
+      return;
+    }
+
+    const setId = summary.id;
+    let payload: unknown;
+    try {
+      payload = await requestJson(buildSetDetailUrl(config, setId), config, metrics);
+    } catch (error) {
+      metrics.requestFailures += 1;
+      throw new Error(
+        `Failed to resolve excluded TCGdex set detail for ${setId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    if (typeof payload !== 'object' || payload === null) {
+      return;
+    }
+
+    const detail = payload as TcgdexSetSummary;
+    hydrated[index] = {
+      ...summary,
+      ...detail,
+      id: typeof detail.id === 'string' && detail.id.trim().length > 0 ? detail.id : summary.id
+    };
+  });
+
+  return hydrated;
+}
+
+async function fetchAllCardIds(
+  config: SeedConfig,
+  excludedSetIds: ReadonlySet<string>,
+  metrics: SeedMetrics
+): Promise<string[]> {
   const collected = new Set<string>();
   let page = 1;
 
@@ -258,9 +468,22 @@ async function fetchAllCardIds(config: SeedConfig, metrics: SeedMetrics): Promis
     const parsed = parseListPage(listPayload, config.pageSize, page);
 
     for (const cardId of parsed.ids) {
-      if (cardId.trim().length > 0) {
-        collected.add(cardId.trim());
+      const trimmed = cardId.trim();
+      if (trimmed.length === 0) {
+        continue;
       }
+
+      metrics.totalCardsScanned += 1;
+
+      const setId = extractSetIdFromCardId(trimmed);
+      if (isExcludedSetId(setId, excludedSetIds)) {
+        metrics.excludedByScope += 1;
+        metrics.skipped += 1;
+        incrementCounter(metrics.skipReasonCounts, 'excluded out-of-scope set');
+        continue;
+      }
+
+      collected.add(trimmed);
       if (config.seedLimit > 0 && collected.size >= config.seedLimit) {
         return [...collected];
       }
@@ -277,8 +500,27 @@ async function fetchAllCardIds(config: SeedConfig, metrics: SeedMetrics): Promis
 }
 
 function extractImageUrl(image: unknown): string | undefined {
+  const normalizeTcgdexAssetUrl = (value: string): string => {
+    try {
+      const parsed = new URL(value);
+      if (parsed.hostname.toLowerCase() !== 'assets.tcgdex.net') {
+        return value;
+      }
+
+      const trimmedPath = parsed.pathname.replace(/\/+$/g, '');
+      if (/\.(png|jpe?g|webp|avif|gif)$/i.test(trimmedPath)) {
+        return value;
+      }
+
+      parsed.pathname = `${trimmedPath}/high.webp`;
+      return parsed.toString();
+    } catch {
+      return value;
+    }
+  };
+
   if (typeof image === 'string' && image.length > 0) {
-    return image;
+    return normalizeTcgdexAssetUrl(image);
   }
 
   if (typeof image !== 'object' || image === null) {
@@ -289,13 +531,40 @@ function extractImageUrl(image: unknown): string | undefined {
   const candidates = [imageObject.large, imageObject.high, imageObject.url, imageObject.small];
   for (const candidate of candidates) {
     if (typeof candidate === 'string' && candidate.length > 0) {
-      return candidate;
+      return normalizeTcgdexAssetUrl(candidate);
     }
   }
   return undefined;
 }
 
-function mapDetailToSeedCard(detail: TcgdexCardDetail): { card?: SeedCard; skipReason?: string } {
+function normalizeSeedRarity(
+  rarityValue: string | undefined,
+  setName: string
+): string | undefined {
+  if (typeof rarityValue !== 'string') {
+    return undefined;
+  }
+
+  const trimmedRarity = rarityValue.trim();
+  if (!trimmedRarity) {
+    return undefined;
+  }
+
+  if (trimmedRarity.toLowerCase() !== 'none') {
+    return trimmedRarity;
+  }
+
+  if (setName.toLowerCase().includes('promo')) {
+    return 'Promo';
+  }
+
+  return undefined;
+}
+
+function mapDetailToSeedCard(
+  detail: TcgdexCardDetail,
+  excludedSetIds: ReadonlySet<string>
+): { card?: SeedCard; skipReason?: string } {
   const cardId = translateTcgdexCardId(detail);
   if (!cardId) {
     return { skipReason: 'unknown card ID' };
@@ -316,6 +585,9 @@ function mapDetailToSeedCard(detail: TcgdexCardDetail): { card?: SeedCard; skipR
   if (!setId) {
     return { skipReason: 'missing set ID' };
   }
+  if (isExcludedSetId(setId, excludedSetIds)) {
+    return { skipReason: 'excluded out-of-scope set' };
+  }
 
   const number = typeof detail.localId === 'string' && detail.localId.length > 0
     ? detail.localId
@@ -324,25 +596,28 @@ function mapDetailToSeedCard(detail: TcgdexCardDetail): { card?: SeedCard; skipR
     return { skipReason: 'missing card number' };
   }
 
-  let rarity: string | undefined;
+  const setName =
+    typeof detail.set?.name === 'string' && detail.set.name.length > 0
+      ? detail.set.name
+      : setId;
+
+  let rawRarity: string | undefined;
   if (typeof detail.rarity === 'string' && detail.rarity.length > 0) {
-    rarity = detail.rarity;
+    rawRarity = detail.rarity;
   } else if (typeof detail.rarity === 'object' && detail.rarity !== null) {
     const rarityName = (detail.rarity as { name?: unknown }).name;
     if (typeof rarityName === 'string' && rarityName.length > 0) {
-      rarity = rarityName;
+      rawRarity = rarityName;
     }
   }
+  const rarity = normalizeSeedRarity(rawRarity, setName);
 
   return {
     card: {
       cardId,
       name,
       setId,
-      setName:
-        typeof detail.set?.name === 'string' && detail.set.name.length > 0
-          ? detail.set.name
-          : setId,
+      setName,
       number,
       rarity,
       imageUrl: extractImageUrl(detail.image)
@@ -376,7 +651,7 @@ async function runWithConcurrency<T>(
   );
 }
 
-function buildPutRequest(card: SeedCard, nowIso: string): WriteRequest {
+function buildPutRequest(card: SeedCard, nowIso: string): SeedWriteRequest {
   const normalizedName = normalizeName(card.name);
   const firstLetter = normalizedName.charAt(0) || '#';
 
@@ -441,7 +716,7 @@ async function writeCards(
       );
 
       metrics.writeBatches += 1;
-      const remaining = response.UnprocessedItems?.[tableName] ?? [];
+      const remaining = (response.UnprocessedItems?.[tableName] ?? []) as SeedWriteRequest[];
       if (remaining.length === 0) {
         break;
       }
@@ -463,6 +738,7 @@ async function run(): Promise<void> {
     totalCardsScanned: 0,
     detailFetched: 0,
     mapped: 0,
+    excludedByScope: 0,
     skipped: 0,
     skipReasonCounts: {},
     requestFailures: 0,
@@ -471,10 +747,16 @@ async function run(): Promise<void> {
   };
 
   const startedAt = Date.now();
+  const excludedSetIds = await resolveExcludedSetIds(config, metrics);
+  console.log(
+    `Resolved ${excludedSetIds.size} excluded set IDs from series: ${config.excludedSeriesIds.join(', ')}`
+  );
+
   console.log('Fetching TCGdex card IDs...');
-  const sourceIds = await fetchAllCardIds(config, metrics);
-  metrics.totalCardsScanned = sourceIds.length;
-  console.log(`Fetched ${sourceIds.length} IDs from TCGdex list pages.`);
+  const sourceIds = await fetchAllCardIds(config, excludedSetIds, metrics);
+  console.log(
+    `Collected ${sourceIds.length} IDs from TCGdex list pages after excluding ${metrics.excludedByScope} out-of-scope cards.`
+  );
 
   const cardsById = new Map<string, SeedCard>();
 
@@ -483,9 +765,12 @@ async function run(): Promise<void> {
       const detailPayload = await requestJson(buildDetailUrl(config, sourceId), config, metrics);
       metrics.detailFetched += 1;
 
-      const mapped = mapDetailToSeedCard(detailPayload as TcgdexCardDetail);
+      const mapped = mapDetailToSeedCard(detailPayload as TcgdexCardDetail, excludedSetIds);
       if (!mapped.card) {
         metrics.skipped += 1;
+        if (mapped.skipReason === 'excluded out-of-scope set') {
+          metrics.excludedByScope += 1;
+        }
         incrementCounter(metrics.skipReasonCounts, mapped.skipReason ?? 'unknown mapping error');
         return;
       }
