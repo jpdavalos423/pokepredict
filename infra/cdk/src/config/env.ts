@@ -59,8 +59,8 @@ export function loadCdkEnvConfig(): CdkEnvConfig {
     ),
     sesFromEmail: readOrDefault('SES_FROM_EMAIL', `alerts+${stage}@pokepredict.dev`),
     fetchRawTimeoutSeconds: readIntOrDefault('FETCH_RAW_TIMEOUT_SECONDS', 900),
-    normalizeTimeoutSeconds: readIntOrDefault('NORMALIZE_TIMEOUT_SECONDS', 300),
-    stateMachineTimeoutMinutes: readIntOrDefault('STATE_MACHINE_TIMEOUT_MINUTES', 30),
+    normalizeTimeoutSeconds: readIntOrDefault('NORMALIZE_TIMEOUT_SECONDS', 900),
+    stateMachineTimeoutMinutes: readIntOrDefault('STATE_MACHINE_TIMEOUT_MINUTES', 60),
     tcgdex: {
       baseUrl: readOrDefault('TCGDEX_BASE_URL', 'https://api.tcgdex.net/v2/en'),
       listPath: readOrDefault('TCGDEX_LIST_PATH', '/cards'),

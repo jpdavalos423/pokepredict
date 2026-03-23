@@ -37,15 +37,20 @@ export function TopNav() {
         </Link>
 
         <nav className="shell-desktop-nav" aria-label="Primary">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn('shell-nav-link', isActivePath(pathname, item.href) ? 'is-active' : '')}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {NAV_ITEMS.map((item) => {
+            const isActive = isActivePath(pathname, item.href);
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn('shell-nav-link', isActive ? 'is-active' : '')}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="shell-mobile-title" aria-live="polite">

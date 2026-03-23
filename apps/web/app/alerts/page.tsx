@@ -207,7 +207,7 @@ export default function AlertsPage() {
       ) : null}
 
       {successMessage ? (
-        <Card className="crud-feedback crud-feedback-success">
+        <Card className="crud-feedback crud-feedback-success" role="status" aria-live="polite">
           <p className="crud-feedback-copy">{successMessage}</p>
         </Card>
       ) : null}

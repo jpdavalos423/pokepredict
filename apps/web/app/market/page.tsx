@@ -123,7 +123,7 @@ function MarketCard({ card, onViewCard }: { card: CardListItem; onViewCard: () =
 
         <div className="market-card-content">
           <div className="market-card-top">
-            <h2 className="market-card-title">{card.name}</h2>
+            <h3 className="market-card-title">{card.name}</h3>
             {card.rarity ? <Badge tone="warning">{card.rarity}</Badge> : null}
           </div>
 
@@ -314,32 +314,48 @@ export default function MarketPage() {
       />
 
       <Card variant="elevated">
-        <form className="market-filters" onSubmit={onSubmit}>
+        <form className="market-filters" onSubmit={onSubmit} aria-busy={isLoading}>
           <div className="market-filters-row">
-            <Input
-              value={queryInput}
-              onChange={(event) => setQueryInput(event.target.value)}
-              placeholder="Search card name (e.g. charizard)"
-              aria-label="Card query"
-            />
-            <Input
-              value={setInput}
-              onChange={(event) => setSetInput(event.target.value)}
-              placeholder="Set id (e.g. sv3)"
-              aria-label="Set id"
-            />
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Searching...' : 'Search'}
-            </Button>
+            <label className="market-field">
+              <span className="market-field-label">Card Query</span>
+              <Input
+                type="search"
+                value={queryInput}
+                onChange={(event) => setQueryInput(event.target.value)}
+                placeholder="Search card name (e.g. charizard)"
+                aria-label="Card query"
+                aria-describedby="market-filter-hint"
+                autoComplete="off"
+              />
+            </label>
+            <label className="market-field">
+              <span className="market-field-label">Set ID</span>
+              <Input
+                value={setInput}
+                onChange={(event) => setSetInput(event.target.value)}
+                placeholder="Set id (e.g. sv3)"
+                aria-label="Set id"
+                aria-describedby="market-filter-hint"
+                autoCapitalize="off"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+            </label>
+            <div className="market-search-action">
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Searching...' : 'Search'}
+              </Button>
+            </div>
           </div>
-          <p className="market-filter-hint">
+          <p className="market-filter-hint" id="market-filter-hint">
             Query-only requires 2+ characters. With set id provided, query can be 1+ character.
           </p>
         </form>
       </Card>
 
       {validationMessage ? (
-        <ErrorBanner title="Search input required" message={validationMessage} />
+        <ErrorBanner title="Search requirements" message={validationMessage} />
       ) : null}
 
       {requestErrorMessage ? (

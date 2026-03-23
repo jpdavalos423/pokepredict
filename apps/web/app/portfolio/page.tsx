@@ -260,7 +260,7 @@ export default function PortfolioPage() {
       ) : null}
 
       {successMessage ? (
-        <Card className="crud-feedback crud-feedback-success">
+        <Card className="crud-feedback crud-feedback-success" role="status" aria-live="polite">
           <p className="crud-feedback-copy">{successMessage}</p>
         </Card>
       ) : null}
@@ -441,10 +441,10 @@ export default function PortfolioPage() {
                     <span>Cost {formatUsdFromCents(holding.costBasisCents)}</span>
                     <span>Buy Date {holding.buyDate}</span>
                     <span>
-                      Latest{' '}
+                      Latest price{' '}
                       {holding.latestPrice
                         ? formatUsdFromCents(holding.latestPrice.marketCents)
-                        : 'Unavailable'}
+                        : 'unavailable'}
                     </span>
                   </div>
 

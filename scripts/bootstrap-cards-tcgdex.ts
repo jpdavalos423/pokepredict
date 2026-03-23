@@ -575,7 +575,7 @@ function mapDetailToSeedCard(
     return { skipReason: 'missing card name' };
   }
 
-  const splitIndex = cardId.indexOf('-');
+  const splitIndex = cardId.lastIndexOf('-');
   const setIdFallback = splitIndex > 0 ? cardId.slice(0, splitIndex) : undefined;
   const numberFallback = splitIndex > 0 ? cardId.slice(splitIndex + 1) : undefined;
 

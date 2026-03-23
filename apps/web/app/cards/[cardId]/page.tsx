@@ -54,6 +54,32 @@ function getTrendTone(
   return 'neutral';
 }
 
+function getHistoryStatus(
+  pointCount: number
+): {
+  tone: 'warning' | 'primary';
+  label: string;
+} {
+  if (pointCount === 0) {
+    return {
+      tone: 'warning',
+      label: 'No history points'
+    };
+  }
+
+  if (pointCount < 4) {
+    return {
+      tone: 'warning',
+      label: `Sparse history: ${pointCount} point${pointCount === 1 ? '' : 's'}`
+    };
+  }
+
+  return {
+    tone: 'primary',
+    label: `History points: ${pointCount}`
+  };
+}
+
 export default function CardDetailPage({ params }: CardDetailPageProps) {
   const router = useRouter();
   const { cardId: rawCardId } = use(params);
@@ -153,7 +179,21 @@ export default function CardDetailPage({ params }: CardDetailPageProps) {
       return '';
     }
 
-    return `${data.priceHistory.points.length} points from ${formatIsoDate(data.priceHistory.from)} to ${formatIsoDate(data.priceHistory.to)}`;
+    const pointCount = data.priceHistory.points.length;
+
+    if (pointCount === 0) {
+      return `No historical points are available in the ${data.priceHistory.range} range yet.`;
+    }
+
+    return `${pointCount} point${pointCount === 1 ? '' : 's'} from ${formatIsoDate(data.priceHistory.from)} to ${formatIsoDate(data.priceHistory.to)}`;
+  }, [data]);
+
+  const historyStatus = useMemo(() => {
+    if (!data) {
+      return getHistoryStatus(0);
+    }
+
+    return getHistoryStatus(data.priceHistory.points.length);
   }, [data]);
 
   const onBackToMarket = useCallback(() => {
@@ -250,29 +290,35 @@ export default function CardDetailPage({ params }: CardDetailPageProps) {
                 </p>
               </div>
 
-              <div className="card-detail-range-group" role="group" aria-label="Price range selector">
-                {PRICE_RANGES.map((priceRange) => (
-                  <button
-                    key={priceRange}
-                    type="button"
-                    className={
-                      priceRange === range
-                        ? 'card-detail-range-button is-active'
-                        : 'card-detail-range-button'
-                    }
-                    onClick={() => changeRange(priceRange)}
-                    disabled={isRefreshing}
-                  >
-                    {priceRange}
-                  </button>
-                ))}
+              <div className="card-detail-chart-controls">
+                <Badge tone={historyStatus.tone}>{historyStatus.label}</Badge>
+                <div className="card-detail-range-group" role="group" aria-label="Price range selector">
+                  {PRICE_RANGES.map((priceRange) => (
+                    <button
+                      key={priceRange}
+                      type="button"
+                      className={
+                        priceRange === range
+                          ? 'card-detail-range-button is-active'
+                          : 'card-detail-range-button'
+                      }
+                      onClick={() => changeRange(priceRange)}
+                      disabled={isRefreshing}
+                      aria-pressed={priceRange === range}
+                    >
+                      {priceRange}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
             <PriceHistoryChart points={data.priceHistory.points} />
 
             {isRefreshing ? (
-              <p className="card-detail-meta-copy card-detail-refresh-copy">Refreshing range...</p>
+              <p className="card-detail-meta-copy card-detail-refresh-copy" aria-live="polite">
+                Refreshing range...
+              </p>
             ) : null}
           </Card>
 
@@ -292,7 +338,12 @@ export default function CardDetailPage({ params }: CardDetailPageProps) {
                   </p>
                 </div>
               ) : (
-                <p className="card-detail-meta-copy">Latest price is not available yet.</p>
+                <div className="card-detail-data-state">
+                  <Badge tone="warning">Latest price unavailable</Badge>
+                  <p className="card-detail-meta-copy">
+                    Latest pricing has not been published yet for this card.
+                  </p>
+                </div>
               )}
             </Card>
 
@@ -319,7 +370,12 @@ export default function CardDetailPage({ params }: CardDetailPageProps) {
                   </p>
                 </div>
               ) : (
-                <p className="card-detail-meta-copy">Signals are not available yet.</p>
+                <div className="card-detail-data-state">
+                  <Badge tone="signal">Signal coverage pending</Badge>
+                  <p className="card-detail-meta-copy">
+                    Analytics coverage is currently sparse for this card and range.
+                  </p>
+                </div>
               )}
             </Card>
 

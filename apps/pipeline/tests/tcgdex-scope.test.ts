@@ -15,6 +15,9 @@ describe('tcgdex scope helpers', () => {
   it('extracts set IDs from card IDs', () => {
     expect(extractSetIdFromCardId('A1-001')).toBe('a1');
     expect(extractSetIdFromCardId('sv3-198')).toBe('sv3');
+    expect(extractSetIdFromCardId('sv10.5w-086')).toBe('sv10.5w');
+    expect(extractSetIdFromCardId('P-A-001')).toBe('p-a');
+    expect(extractSetIdFromCardId('tk-ex-latio-1')).toBe('tk-ex-latio');
     expect(extractSetIdFromCardId('invalid')).toBeUndefined();
   });
 

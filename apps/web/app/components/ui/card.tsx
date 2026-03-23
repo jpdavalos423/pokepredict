@@ -1,15 +1,19 @@
-import type { ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from './cn';
 
 type CardVariant = 'default' | 'elevated';
 
-interface CardProps {
+interface CardProps extends HTMLAttributes<HTMLElement> {
   children: ReactNode;
-  className?: string;
   variant?: CardVariant;
 }
 
-export function Card({ children, className, variant = 'default' }: CardProps) {
+export function Card({
+  children,
+  className,
+  variant = 'default',
+  ...rest
+}: CardProps) {
   return (
     <article
       className={cn(
@@ -17,6 +21,7 @@ export function Card({ children, className, variant = 'default' }: CardProps) {
         variant === 'elevated' ? 'ui-card-elevated' : '',
         className
       )}
+      {...rest}
     >
       {children}
     </article>

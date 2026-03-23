@@ -100,4 +100,16 @@ describe('tcgdex mapper', () => {
 
     expect(translateTcgdexCardId(card)).toBe('sv3-TG30');
   });
+
+  it('supports dotted and hyphenated set IDs', () => {
+    const dotted = createCard();
+    dotted.id = 'SV10.5W-086';
+    expect(translateTcgdexCardId(dotted)).toBe('sv10.5w-086');
+
+    const hyphenated = createCard();
+    hyphenated.id = 'bad/id';
+    hyphenated.set = { id: 'P-A' };
+    hyphenated.localId = '001';
+    expect(translateTcgdexCardId(hyphenated)).toBe('p-a-001');
+  });
 });

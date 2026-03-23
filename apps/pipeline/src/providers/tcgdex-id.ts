@@ -10,7 +10,7 @@ export function normalizeTcgdexCardId(candidate: string): string | undefined {
     return undefined;
   }
 
-  const hyphenIndex = compact.indexOf('-');
+  const hyphenIndex = compact.lastIndexOf('-');
   if (hyphenIndex <= 0 || hyphenIndex === compact.length - 1) {
     return undefined;
   }
@@ -18,7 +18,7 @@ export function normalizeTcgdexCardId(candidate: string): string | undefined {
   const setPart = compact.slice(0, hyphenIndex).toLowerCase();
   const localPart = compact.slice(hyphenIndex + 1);
 
-  if (!/^[a-z0-9]+$/.test(setPart)) {
+  if (!/^[a-z0-9.-]+$/.test(setPart)) {
     return undefined;
   }
 

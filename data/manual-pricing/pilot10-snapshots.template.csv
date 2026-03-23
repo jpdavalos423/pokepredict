@@ -1,0 +1,11 @@
+asOf,cardId,source,currency,marketPrice,lowPrice,highPrice,sampleSize,method
+2026-03-17T00:00:00.000Z,base1-4,manual-ebay,USD,0,0,0,0,trimmed_median_10pct
+2026-03-17T00:00:00.000Z,sv3-169,manual-ebay,USD,0,0,0,0,trimmed_median_10pct
+2026-03-17T00:00:00.000Z,sv3-198,manual-ebay,USD,0,0,0,0,trimmed_median_10pct
+2026-03-17T00:00:00.000Z,sv2-203,manual-ebay,USD,0,0,0,0,trimmed_median_10pct
+2026-03-17T00:00:00.000Z,swsh12-TG30,manual-ebay,USD,0,0,0,0,trimmed_median_10pct
+2026-03-17T00:00:00.000Z,sm11-125,manual-ebay,USD,0,0,0,0,trimmed_median_10pct
+2026-03-17T00:00:00.000Z,bw11-102,manual-ebay,USD,0,0,0,0,trimmed_median_10pct
+2026-03-17T00:00:00.000Z,ex6-108,manual-ebay,USD,0,0,0,0,trimmed_median_10pct
+2026-03-17T00:00:00.000Z,ex15-91,manual-ebay,USD,0,0,0,0,trimmed_median_10pct
+2026-03-17T00:00:00.000Z,me02.5-276,manual-ebay,USD,0,0,0,0,trimmed_median_10pct

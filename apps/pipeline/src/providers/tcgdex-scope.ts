@@ -44,7 +44,7 @@ export function extractSetIdFromCardId(cardId: string): string | undefined {
     return undefined;
   }
 
-  const splitIndex = trimmed.indexOf('-');
+  const splitIndex = trimmed.lastIndexOf('-');
   if (splitIndex <= 0) {
     return undefined;
   }

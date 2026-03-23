@@ -15,8 +15,8 @@ describe('Phase 5 stack', () => {
       cursorSigningSecretVersion: 1,
       sesFromEmail: 'alerts+dev@pokepredict.dev',
       fetchRawTimeoutSeconds: 900,
-      normalizeTimeoutSeconds: 300,
-      stateMachineTimeoutMinutes: 30,
+      normalizeTimeoutSeconds: 900,
+      stateMachineTimeoutMinutes: 60,
       tcgdex: {
         baseUrl: 'https://api.tcgdex.net/v2/en',
         listPath: '/cards',

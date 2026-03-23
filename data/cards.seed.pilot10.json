@@ -1,0 +1,92 @@
+[
+  {
+    "cardId": "base1-4",
+    "name": "Charizard",
+    "setId": "base1",
+    "setName": "Base Set",
+    "number": "4",
+    "rarity": "Rare",
+    "imageUrl": "https://assets.tcgdex.net/en/base/base1/4/high.webp"
+  },
+  {
+    "cardId": "sv3-169",
+    "name": "Charizard ex",
+    "setId": "sv3",
+    "setName": "151",
+    "number": "169",
+    "rarity": "Ultra Rare",
+    "imageUrl": "https://images.pokepredict.dev/cards/sv3-169.png"
+  },
+  {
+    "cardId": "sv3-198",
+    "name": "Venusaur ex",
+    "setId": "sv3",
+    "setName": "151",
+    "number": "198",
+    "rarity": "Special Illustration Rare",
+    "imageUrl": "https://images.pokepredict.dev/cards/sv3-198.png"
+  },
+  {
+    "cardId": "sv2-203",
+    "name": "Iono",
+    "setId": "sv2",
+    "setName": "Paldea Evolved",
+    "number": "203",
+    "rarity": "Special Illustration Rare",
+    "imageUrl": "https://images.pokepredict.dev/cards/sv2-203.png"
+  },
+  {
+    "cardId": "swsh12-TG30",
+    "name": "Duraludon VMAX",
+    "setId": "swsh12",
+    "setName": "Silver Tempest",
+    "number": "TG30",
+    "rarity": "Secret Rare",
+    "imageUrl": "https://assets.tcgdex.net/en/swsh/swsh12/TG30/high.webp"
+  },
+  {
+    "cardId": "sm11-125",
+    "name": "Umbreon & Darkrai GX",
+    "setId": "sm11",
+    "setName": "Unified Minds",
+    "number": "125",
+    "rarity": "Ultra Rare",
+    "imageUrl": "https://assets.tcgdex.net/en/sm/sm11/125/high.webp"
+  },
+  {
+    "cardId": "bw11-102",
+    "name": "Lugia-EX",
+    "setId": "bw11",
+    "setName": "Legendary Treasures",
+    "number": "102",
+    "rarity": "Rare",
+    "imageUrl": "https://assets.tcgdex.net/en/bw/bw11/102/high.webp"
+  },
+  {
+    "cardId": "ex6-108",
+    "name": "Gengar ex",
+    "setId": "ex6",
+    "setName": "FireRed & LeafGreen",
+    "number": "108",
+    "rarity": "Rare",
+    "imageUrl": "https://assets.tcgdex.net/en/ex/ex6/108/high.webp"
+  },
+  {
+    "cardId": "ex15-91",
+    "name": "Dragonite ex δ",
+    "setId": "ex15",
+    "setName": "Dragon Frontiers",
+    "number": "91",
+    "rarity": "Rare",
+    "imageUrl": "https://assets.tcgdex.net/en/ex/ex15/91/high.webp"
+  },
+  {
+    "cardId": "me02.5-276",
+    "name": "Pikachu ex",
+    "setId": "me02.5",
+    "setName": "Ascended Heroes",
+    "number": "276",
+    "rarity": "Special illustration rare",
+    "imageUrl": "https://assets.tcgdex.net/en/me/me02.5/276/high.webp"
+  }
+]

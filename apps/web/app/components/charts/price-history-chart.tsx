@@ -1,4 +1,5 @@
 import type { PriceHistoryPoint } from '@pokepredict/shared';
+import { useId, useMemo, useState } from 'react';
 import { formatUsdFromCents } from '../../../lib/format';
 
 interface PriceHistoryChartProps {
@@ -18,6 +19,7 @@ const PADDING_LEFT = 56;
 const PADDING_RIGHT = 18;
 const PADDING_TOP = 18;
 const PADDING_BOTTOM = 36;
+const SPARSE_HISTORY_THRESHOLD = 4;
 
 const SHORT_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -47,11 +49,14 @@ function buildPoints(points: PriceHistoryPoint[]): ChartPoint[] {
   const { min, max } = getMinMax(values);
   const innerWidth = CHART_WIDTH - PADDING_LEFT - PADDING_RIGHT;
   const innerHeight = CHART_HEIGHT - PADDING_TOP - PADDING_BOTTOM;
-  const horizontalStep = points.length > 1 ? innerWidth / (points.length - 1) : innerWidth / 2;
+  const horizontalStep = points.length > 1 ? innerWidth / (points.length - 1) : 0;
 
   return points.map((point, index) => {
     const ratio = (point.marketCents - min) / (max - min);
-    const x = PADDING_LEFT + horizontalStep * index;
+    const x =
+      points.length > 1
+        ? PADDING_LEFT + horizontalStep * index
+        : PADDING_LEFT + innerWidth / 2;
     const y = PADDING_TOP + (1 - ratio) * innerHeight;
 
     return {
@@ -96,6 +101,12 @@ function getYAxisTicks(min: number, max: number, tickCount = 4): number[] {
 }
 
 export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
+  const [activePointTs, setActivePointTs] = useState<string | null>(null);
+  const chartId = useId().replace(/:/g, '-');
+  const gradientId = `price-area-gradient-${chartId}`;
+  const chartTitleId = `price-chart-title-${chartId}`;
+  const chartDescId = `price-chart-description-${chartId}`;
+
   if (!points.length) {
     return (
       <div className="price-chart-empty" role="status">
@@ -105,6 +116,7 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
   }
 
   const sortedPoints = [...points].sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
+  const isSparseHistory = sortedPoints.length < SPARSE_HISTORY_THRESHOLD;
   const chartPoints = buildPoints(sortedPoints);
   const values = sortedPoints.map((point) => point.marketCents);
   const { min, max } = getMinMax(values);
@@ -120,12 +132,29 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
   ).filter(
     (point, index, points) => points.findIndex((candidate) => candidate.ts === point.ts) === index
   );
+  const activePoint = useMemo(() => {
+    if (!activePointTs) {
+      return null;
+    }
+
+    return sortedPoints.find((point) => point.ts === activePointTs) ?? null;
+  }, [activePointTs, sortedPoints]);
 
   return (
     <div className="price-chart">
-      <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} role="img" aria-label="Card market price history chart">
+      <svg
+        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+        role="img"
+        aria-labelledby={chartTitleId}
+        aria-describedby={chartDescId}
+        onMouseLeave={() => setActivePointTs(null)}
+      >
+        <title id={chartTitleId}>Card market price history</title>
+        <desc id={chartDescId}>
+          {`Price history chart with ${sortedPoints.length} point${sortedPoints.length === 1 ? '' : 's'} in the selected range.`}
+        </desc>
         <defs>
-          <linearGradient id="price-area-gradient" x1="0" x2="0" y1="0" y2="1">
+          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="rgba(93, 168, 255, 0.28)" />
             <stop offset="100%" stopColor="rgba(93, 168, 255, 0.02)" />
           </linearGradient>
@@ -150,18 +179,29 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
           );
         })}
 
-        <path d={areaPath} fill="url(#price-area-gradient)" />
+        <path d={areaPath} fill={`url(#${gradientId})`} />
         <path className="price-chart-line" d={linePath} />
 
-        {chartPoints.map((point, index) => (
-          <circle
-            key={`${point.ts}-${index}`}
-            className="price-chart-point"
-            cx={point.x}
-            cy={point.y}
-            r={index === chartPoints.length - 1 ? 4.2 : 3.1}
-          />
-        ))}
+        {chartPoints.map((point, index) => {
+          const isActive = activePointTs === point.ts;
+          return (
+            <circle
+              key={`${point.ts}-${index}`}
+              className={isActive ? 'price-chart-point is-active' : 'price-chart-point'}
+              cx={point.x}
+              cy={point.y}
+              r={isActive ? 5.6 : index === chartPoints.length - 1 ? 4.2 : 3.1}
+              tabIndex={0}
+              role="button"
+              data-point-ts={point.ts}
+              data-active={isActive ? 'true' : 'false'}
+              aria-label={`${formatShortDate(point.ts)} ${formatUsdFromCents(point.marketCents)}`}
+              onMouseEnter={() => setActivePointTs(point.ts)}
+              onFocus={() => setActivePointTs(point.ts)}
+              onBlur={() => setActivePointTs(null)}
+            />
+          );
+        })}
 
         {xAxisLabels.map((point, index) => {
           const chartPoint = chartPoints.find((entry) => entry.ts === point.ts);
@@ -182,6 +222,16 @@ export function PriceHistoryChart({ points }: PriceHistoryChartProps) {
           );
         })}
       </svg>
+      <p className="price-chart-interaction-copy" aria-live="polite">
+        {activePoint
+          ? `Highlighted ${formatShortDate(activePoint.ts)} at ${formatUsdFromCents(activePoint.marketCents)}`
+          : 'Hover or focus a chart point to highlight it.'}
+      </p>
+      {isSparseHistory ? (
+        <p className="price-chart-note">
+          Sparse history detected. Trend visuals may be less reliable until more points are available.
+        </p>
+      ) : null}
     </div>
   );
 }
